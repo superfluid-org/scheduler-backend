@@ -1,0 +1,15 @@
+{
+  "name": "vesting-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@superfluid-finance/metadata": "^1.1.21",
+    "ethers": "^6.9.0"
+  }
+}

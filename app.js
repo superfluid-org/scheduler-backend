@@ -308,6 +308,3 @@ async function run() {
 }
 
 run();
-
-// example for how to analyze the state file:
-// cat state_polygon-mumbai.json | jq '.schedules[] | select(.started == false)'

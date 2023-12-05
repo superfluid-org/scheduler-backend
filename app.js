@@ -15,7 +15,8 @@ const vSchedAddrOverride = process.env.VSCHED_ADDR; // default: get from metadat
 // where to start when no state is persisted. Defaults to protocol deployment block 
 // which can be long before scheduler contract deployment, thus take unnecessarily long to bootstrap.
 const initStartBlockOverride = process.env.START_BLOCK ? parseInt(process.env.START_BLOCK) : undefined;
-// eth-goerli: 8507393, polygon-mumbai: 33383487, optimism-mainnet: 67820482, polygon-mainnet: 38148531, eth-mainnet: 16418958
+// eth-goerli: 8507393, polygon-mumbai: 33383487, optimism-mainnet: 67820482, polygon-mainnet: 38148531, 
+// eth-mainnet: 16418958, avalanche-c: 25012325, bsc-mainnet: 24833789, xdai-mainnet: 25992375, arbitrum-one: 53448990
 
 // margin to end block in order to avoid reorgs (which aren't handled)
 // caution: this can cause state mismatch if the next run occurs before the chain advances by <offset> blocks
@@ -81,8 +82,6 @@ async function run() {
 
         const parsedLog = contract.interface.parseLog(event);
 
-        //console.log(`keys: ${JSON.stringify(Object.keys(parsedLog.args), null, 2)}`);
-
         return {
             name: eventName,
             // mandatory in all events
@@ -90,10 +89,10 @@ async function run() {
             sender: parsedLog.args.sender,
             receiver: parsedLog.args.receiver,
             // in some events
-            startDate: parsedLog.args.startDate ? parseInt(parsedLog.args.startDate) : undefined,
-            cliffDate: parsedLog.args.cliffDate ? parseInt(parsedLog.args.cliffDate) : undefined,
+            startDate: parsedLog.args.startDate !== undefined ? parseInt(parsedLog.args.startDate) : undefined,
+            cliffDate: parsedLog.args.cliffDate !== undefined ? parseInt(parsedLog.args.cliffDate) : undefined,
             //flowRate: parsedLog.args.flowRate.toString(),
-            endDate: parsedLog.args.endDate ? parseInt(parsedLog.args.endDate) : undefined,
+            endDate: parsedLog.args.endDate !== undefined ? parseInt(parsedLog.args.endDate) : undefined,
             //cliffAmount: parsedLog.args.cliffAmount.toString(),
             // metadata
             blockNumber: event.blockNumber,

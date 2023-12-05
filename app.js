@@ -22,6 +22,8 @@ const initStartBlockOverride = process.env.START_BLOCK ? parseInt(process.env.ST
 // caution: this can cause state mismatch if the next run occurs before the chain advances by <offset> blocks
 const endBlockOffset = process.env.END_BLOCK_OFFSET ? parseInt(process.env.END_BLOCK_OFFSET) : 30;
 
+const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.env.LOGS_QUERY_RANGE) : undefined;
+
 
 async function run() {
     // =====================================
@@ -101,16 +103,17 @@ async function run() {
     }
 
     const endBlock = (await provider.getBlockNumber()) - endBlockOffset;
+    const logsQueryRange = logsQueryRangeOverride || network.logsQueryRange;
     if (endBlock < startBlock) throw `endBlock ${endBlock} < startBlock ${startBlock}`;
-    console.log(`*** query for past events from ${startBlock} to ${endBlock} (delta: ${endBlock - startBlock}) with log range ${network.logsQueryRange} ...`);
+    console.log(`*** query for past events from ${startBlock} to ${endBlock} (delta: ${endBlock - startBlock}) with logs query range ${logsQueryRange} ...`);
     
     function getIndexOf(superToken, sender, receiver) {
         return activeSchedules.findIndex(v => v.superToken === superToken && v.sender === sender && v.receiver === receiver);
     }
 
     // classic iteration over range queries for logs, usually done in a few mins with a "close" RPC
-    for (let fromBlock = startBlock; fromBlock <= endBlock; fromBlock += network.logsQueryRange) {
-        const toBlock = Math.min(fromBlock + network.logsQueryRange - 1, endBlock);
+    for (let fromBlock = startBlock; fromBlock <= endBlock; fromBlock += logsQueryRange) {
+        const toBlock = Math.min(fromBlock + logsQueryRange - 1, endBlock);
 
         const topicFilter = [
             (await vSched.filters.VestingScheduleCreated().getTopicFilter())

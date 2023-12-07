@@ -24,6 +24,8 @@ const endBlockOffset = process.env.END_BLOCK_OFFSET ? parseInt(process.env.END_B
 
 const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.env.LOGS_QUERY_RANGE) : undefined;
 
+const executionDelayS = process.env.EXECUTION_DELAY ? parseInt(process.env.EXECUTION_DELAY) : 0;
+
 
 async function run() {
     // =====================================
@@ -246,12 +248,12 @@ async function run() {
     const blockTime = parseInt((await provider.getBlock()).timestamp);
     const startDateValidAfter = parseInt(await vSched.START_DATE_VALID_AFTER());
     const endDateValidBefore = parseInt(await vSched.END_DATE_VALID_BEFORE());
-    console.log(`*** blockTime: ${blockTime}, startDateValidAfter: ${startDateValidAfter}, endDateValidBefore: ${endDateValidBefore}`);
+    console.log(`*** blockTime: ${blockTime}, startDateValidAfter: ${startDateValidAfter}, endDateValidBefore: ${endDateValidBefore}, executionDelay: ${executionDelayS} s`);
     
-    const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate <= blockTime);
+    const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime);
     console.log(`${toBeStarted.length} of ${activeSchedules.length} schedules to be started`);
 
-    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate - endDateValidBefore <= blockTime);
+    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate + executionDelayS - endDateValidBefore <= blockTime);
     console.log(`${toBeStopped.length} of ${activeSchedules.length} schedules to be stopped`);
 
     for (let i = 0; i < toBeStarted.length; i++) {

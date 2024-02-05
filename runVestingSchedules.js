@@ -3,7 +3,6 @@ const { ethers } = require("ethers");
 const sfMeta = require("@superfluid-finance/metadata")
 const VestingSchedulerAbi = require("./VestingSchedulerAbi.json");
 
-
 const privKey = process.env.PRIVKEY;
 if (!privKey) throw "missing PRIVKEY env var";
 
@@ -12,10 +11,10 @@ if (!rpcUrl) throw "missing RPC env var";
 
 const vSchedAddrOverride = process.env.VSCHED_ADDR; // default: get from metadata
 
-// where to start when no state is persisted. Defaults to protocol deployment block 
+// where to start when no state is persisted. Defaults to protocol deployment block
 // which can be long before scheduler contract deployment, thus take unnecessarily long to bootstrap.
 const initStartBlockOverride = process.env.START_BLOCK ? parseInt(process.env.START_BLOCK) : undefined;
-// eth-goerli: 8507393, polygon-mumbai: 33383487, optimism-mainnet: 67820482, polygon-mainnet: 38148531, 
+// eth-goerli: 8507393, polygon-mumbai: 33383487, optimism-mainnet: 67820482, polygon-mainnet: 38148531,
 // eth-mainnet: 16418958, avalanche-c: 25012325, bsc-mainnet: 24833789, xdai-mainnet: 25992375, arbitrum-one: 53448990
 
 // margin to end block in order to avoid reorgs (which aren't handled)
@@ -95,9 +94,7 @@ async function run() {
             // in some events
             startDate: parsedLog.args.startDate !== undefined ? parseInt(parsedLog.args.startDate) : undefined,
             cliffDate: parsedLog.args.cliffDate !== undefined ? parseInt(parsedLog.args.cliffDate) : undefined,
-            //flowRate: parsedLog.args.flowRate.toString(),
             endDate: parsedLog.args.endDate !== undefined ? parseInt(parsedLog.args.endDate) : undefined,
-            //cliffAmount: parsedLog.args.cliffAmount.toString(),
             // metadata
             blockNumber: event.blockNumber,
             transactionHash: event.transactionHash
@@ -108,7 +105,7 @@ async function run() {
     const logsQueryRange = logsQueryRangeOverride || network.logsQueryRange;
     if (endBlock < startBlock) throw `endBlock ${endBlock} < startBlock ${startBlock}`;
     console.log(`*** query for past events from ${startBlock} to ${endBlock} (delta: ${endBlock - startBlock}) with logs query range ${logsQueryRange} ...`);
-    
+
     function getIndexOf(superToken, sender, receiver) {
         return activeSchedules.findIndex(v => v.superToken === superToken && v.sender === sender && v.receiver === receiver);
     }
@@ -128,7 +125,7 @@ async function run() {
 
         const newEvents = await getEventsInRange(topicFilter, fromBlock, toBlock);
         console.log(`*** query for past events from ${fromBlock} to ${toBlock} (of ${endBlock}) returned ${newEvents.length} events`);
-        
+
         const eventHandlerFunctions = {
             handleVestingScheduleCreated: function(e) {
                 //console.log(`created event ${JSON.stringify(e, null, 2)}`);
@@ -148,10 +145,6 @@ async function run() {
                     // start & end date tell us when to act
                     startDate /*cliffAndFlowDate in contract*/: parsedEvent.cliffDate == 0 ? parsedEvent.startDate : parsedEvent.cliffDate,
                     endDate: parsedEvent.endDate,
-                    // the rest we don't really need, but remember anyway
-                    flowRate: parsedEvent.flowRate,
-                    cliffAmount: parsedEvent.cliffAmount,
-                    createdTxHash: parsedEvent.transactionHash,
                     // our meta state, to be updated by consecutive events
                     started: false,
                     stopped: false,
@@ -193,7 +186,7 @@ async function run() {
                 // update it
                 const curIndex = getIndexOf(parsedEvent.superToken, parsedEvent.sender, parsedEvent.receiver);
                 if (curIndex == -1) throw `trying to start schedule which doesn't exist: ${parsedEvent.superToken} ${parsedEvent.sender} ${parsedEvent.receiver}`;
-                
+
                 activeSchedules[curIndex].started = true;
             },
 
@@ -204,7 +197,7 @@ async function run() {
                 // update it
                 const curIndex = getIndexOf(parsedEvent.superToken, parsedEvent.sender, parsedEvent.receiver);
                 if (curIndex == -1) throw `trying to stop schedule which doesn't exist: ${parsedEvent.superToken} ${parsedEvent.sender} ${parsedEvent.receiver}`;
-                
+
                 activeSchedules[curIndex].stopped = true;
                 removedSchedules.push(activeSchedules[curIndex]);
                 activeSchedules.splice(curIndex, 1);
@@ -217,7 +210,7 @@ async function run() {
                 // update it
                 const curIndex = getIndexOf(parsedEvent.superToken, parsedEvent.sender, parsedEvent.receiver);
                 if (curIndex == -1) throw `trying to stop schedule which doesn't exist: ${parsedEvent.superToken} ${parsedEvent.sender} ${parsedEvent.receiver}`;
-                
+
                 activeSchedules[curIndex].failed = true;
                 removedSchedules.push(activeSchedules[curIndex]);
                 activeSchedules.splice(curIndex, 1);
@@ -249,7 +242,7 @@ async function run() {
     const startDateValidAfter = parseInt(await vSched.START_DATE_VALID_AFTER());
     const endDateValidBefore = parseInt(await vSched.END_DATE_VALID_BEFORE());
     console.log(`*** blockTime: ${blockTime}, startDateValidAfter: ${startDateValidAfter}, endDateValidBefore: ${endDateValidBefore}, executionDelay: ${executionDelayS} s`);
-    
+
     const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime);
     console.log(`${toBeStarted.length} of ${activeSchedules.length} schedules to be started`);
 
@@ -271,13 +264,15 @@ async function run() {
         // sanity check
         const curState = await vSched.getVestingSchedule(s.superToken, s.sender, s.receiver);
         if (s.endDate != parseInt(curState.endDate)) throw `state mismatch for ${s.superToken} ${s.sender} ${s.receiver} | contract endDate: ${curState.endDate.toString()}, persisted endDate ${curState.endDate}`;
-        
+
         try {
             console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver} - ${dueSinceS} s overdue | cliffAndFlowDate: ${curState.cliffAndFlowDate.toString()}, endDate ${curState.endDate}, flowRate ${curState.flowRate}, cliffAmount ${curState.cliffAmount}`);
-            const tx = await vSched.connect(signer).executeCliffAndFlow(s.superToken, s.sender, s.receiver);
+            const estGasLimit = await vSched.estimateGas.executeCliffAndFlow(s.superToken, s.sender, s.receiver, { from: signer.address });
+            const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
+            const tx = await vSched.connect(signer).executeCliffAndFlow(s.superToken, s.sender, s.receiver, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`+++ receipt: ${receipt}`);
+            console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
             // we don't change the local state, but rely on resulting events parsed when running next
         } catch(e) {
             console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
@@ -292,16 +287,17 @@ async function run() {
         const curState = await vSched.getVestingSchedule(s.superToken, s.sender, s.receiver);
         if (s.endDate != parseInt(curState.endDate)) throw `state mismatch for ${s.superToken} ${s.sender} ${s.receiver} | contract endDate: ${curState.endDate.toString()}, persisted endDate ${curState.endDate}`;
 
-        const stoppableSince = s.endDate - endDateValidBefore;
         if (blockTime > s.endDate) {
             console.warn(`!!! stopping overdue, end time missed for ${s.superToken} ${s.sender} ${s.receiver} by ${blockTime - s.endDate} s !!!`);
         }
         try {
             console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver} - s.endDate ${curState.endDate}, flowRate ${curState.flowRate}`);
-            const tx = await vSched.connect(signer).executeEndVesting(s.superToken, s.sender, s.receiver);
+            const estGasLimit = await vSched.estimateGas.executeEndVesting(s.superToken, s.sender, s.receiver, { from: signer.address });
+            const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
+            const tx = await vSched.connect(signer).executeEndVesting(s.superToken, s.sender, s.receiver, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`+++ receipt: ${JSON.stringify(receipt, null, 2)}`);
+            console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
             // we don't change the local state, but rely on resulting events parsed when running next
         } catch(e) {
             console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);

@@ -54,7 +54,7 @@ async function run() {
     let removedSchedules = [];
 
     // load persisted state
-    const stateFileName = `flowschedules_${network.name}.json`;
+    const stateFileName = `data/flowschedules_${network.name}.json`;
     if (fs.existsSync(stateFileName)) {
         const state = JSON.parse(fs.readFileSync(stateFileName));
         console.log(`init: loaded state from file - startBlock: ${state.lastBlock}, activeSchedules: ${state.activeSchedules.length}, removedSchedules: ${state.removedSchedules.length}`);

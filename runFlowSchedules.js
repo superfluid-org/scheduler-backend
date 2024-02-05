@@ -238,7 +238,7 @@ async function run() {
 
         try {
             console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver} - ${dueSinceS} s overdue | startDate: ${curState.startDate.toString()}, endDate ${curState.endDate}, flowRate ${curState.flowRate}, startAmount ${curState.startAmount}`);
-            const estGasLimit = await fSched.estimateGas.executeCreateFlow(s.superToken, s.sender, s.receiver, curState.userData, { from: signer.address });
+            const estGasLimit = await fSched.executeCreateFlow.estimateGas(s.superToken, s.sender, s.receiver, curState.userData, { from: signer.address });
             const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
             const tx = await fSched.connect(signer).executeCreateFlow(s.superToken, s.sender, s.receiver, curState.userData, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);
@@ -260,7 +260,7 @@ async function run() {
 
         try {
             console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver} - s.endDate ${curState.endDate}, flowRate ${curState.flowRate}`);
-            const estGasLimit = await fSched.estimateGas.executeDeleteFlow(s.superToken, s.sender, s.receiver, curState.userData, { from: signer.address });
+            const estGasLimit = await fSched.executeDeleteFlow.estimateGas(s.superToken, s.sender, s.receiver, curState.userData, { from: signer.address });
             const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
             const tx = await fSched.connect(signer).executeDeleteFlow(s.superToken, s.sender, s.receiver, curState.userData, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);

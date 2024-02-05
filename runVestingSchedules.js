@@ -267,7 +267,7 @@ async function run() {
 
         try {
             console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver} - ${dueSinceS} s overdue | cliffAndFlowDate: ${curState.cliffAndFlowDate.toString()}, endDate ${curState.endDate}, flowRate ${curState.flowRate}, cliffAmount ${curState.cliffAmount}`);
-            const estGasLimit = await vSched.estimateGas.executeCliffAndFlow(s.superToken, s.sender, s.receiver, { from: signer.address });
+            const estGasLimit = await vSched.executeCliffAndFlow.estimateGas(s.superToken, s.sender, s.receiver, { from: signer.address });
             const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
             const tx = await vSched.connect(signer).executeCliffAndFlow(s.superToken, s.sender, s.receiver, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);
@@ -292,7 +292,7 @@ async function run() {
         }
         try {
             console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver} - s.endDate ${curState.endDate}, flowRate ${curState.flowRate}`);
-            const estGasLimit = await vSched.estimateGas.executeEndVesting(s.superToken, s.sender, s.receiver, { from: signer.address });
+            const estGasLimit = await vSched.executeEndVesting.estimateGas(s.superToken, s.sender, s.receiver, { from: signer.address });
             const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
             const tx = await vSched.connect(signer).executeEndVesting(s.superToken, s.sender, s.receiver, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);

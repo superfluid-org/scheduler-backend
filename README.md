@@ -7,12 +7,17 @@ Setup:
 yarn install
 ```
 
-Run:
+Run vesting schedules:
 ```
-RPC=<url> PRIVKEY=<pk> node app.js
+RPC=<url> PRIVKEY=<pk> node runVestingSchules.js
 ```
 
-For other (optional) env vars, see `app.js`.
+Run flow schedules:
+```
+RPC=<url> PRIVKEY=<pk> node runFlowSchules.js
+```
+
+For other (optional) env vars, check the source files.
 
 ## How it works
 * initialize for the RPC defined network (using metadata)

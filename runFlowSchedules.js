@@ -217,7 +217,7 @@ async function run() {
     const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime);
     console.log(`${toBeStarted.length} of ${activeSchedules.length} schedules to be started`);
 
-    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate + executionDelayS <= blockTime);
+    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime);
     console.log(`${toBeStopped.length} of ${activeSchedules.length} schedules to be stopped`);
 
     for (let i = 0; i < toBeStarted.length; i++) {

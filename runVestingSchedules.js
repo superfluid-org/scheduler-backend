@@ -33,7 +33,7 @@ async function run() {
 
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const chainId = parseInt((await provider.getNetwork()).chainId);
-    console.log(`init: connected to network via RPC ${rpcUrl} with chainId ${chainId}`);
+    console.log(`init: connected to network via RPC ${rpcUrl} with chainId ${chainId} at ${new Date()}`);
 
     const network = sfMeta.getNetworkByChainId(chainId);
     if (!network) throw `no network found for chainId ${chainId}`;
@@ -268,7 +268,7 @@ async function run() {
         try {
             console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver} - ${dueSinceS} s overdue | cliffAndFlowDate: ${curState.cliffAndFlowDate.toString()}, endDate ${curState.endDate}, flowRate ${curState.flowRate}, cliffAmount ${curState.cliffAmount}`);
             const estGasLimit = await vSched.executeCliffAndFlow.estimateGas(s.superToken, s.sender, s.receiver, { from: signer.address });
-            const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
+            const gasLimit = estGasLimit * BigInt(140) / BigInt(100); // increase by 40%
             const tx = await vSched.connect(signer).executeCliffAndFlow(s.superToken, s.sender, s.receiver, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);
             const receipt = await tx.wait();
@@ -293,7 +293,7 @@ async function run() {
         try {
             console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver} - s.endDate ${curState.endDate}, flowRate ${curState.flowRate}`);
             const estGasLimit = await vSched.executeEndVesting.estimateGas(s.superToken, s.sender, s.receiver, { from: signer.address });
-            const gasLimit = estGasLimit.mul(140).div(100); // increase by 40%
+            const gasLimit = estGasLimit * BigInt(140) / BigInt(100); // increase by 40%
             const tx = await vSched.connect(signer).executeEndVesting(s.superToken, s.sender, s.receiver, { gasLimit });
             console.log(`+++ waiting for tx ${tx.hash}`);
             const receipt = await tx.wait();

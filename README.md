@@ -1,6 +1,6 @@
 # About
 
-Minimal Superfluid [Vesting|Flow]Scheduler executor with no runtime dependencies other than an RPC endpoint.
+Minimal Superfluid [Vesting|Flow|Wrap]Scheduler executor with no runtime dependencies other than an RPC endpoint.
 
 Setup:
 ```
@@ -17,6 +17,11 @@ Run flow schedules:
 RPC=<url> PRIVKEY=<pk> node runFlowSchules.js
 ```
 
+Run wrap schedules:
+```
+RPC=<url> PRIVKEY=<pk> node runWrapSchedule.js
+```
+
 For other (optional) env vars, check the source files.
 
 ## How it works
@@ -26,7 +31,7 @@ For other (optional) env vars, check the source files.
 
 The current state is written to a json file named `state_<network>.json`.
 
-The process quits after having processed everything, it's designed to be periodically started, e.g. by a cronjob.  
+The process quits after having processed everything, it's designed to be periodically started, e.g. by a cronjob.
 (For robustness, some mechanism to watch and restart on failure would be needed anyway)
 
 You can query state files with jq, e.g.
@@ -37,7 +42,7 @@ gives you the active vesting schedules for Polygon mainnet which are due to be s
 
 ## What next?
 
-The current implementation of doing transactions isn't ideal for batches of schedules due at the same time.  
+The current implementation of doing transactions isn't ideal for batches of schedules due at the same time.
 Should batch transactions, e.g. using Multicall3.
 
 Writing to an sqlite DB would also be more elegant than just a json file. But in terms of scalability that becomes relevant only with much more usage.

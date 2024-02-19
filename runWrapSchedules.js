@@ -138,7 +138,13 @@ async function run() {
                 const parsedEvent = parseEvent(wrapMgr, e);
 
                 console.log(`CREATED ${JSON.stringify(parsedEvent, null, 2)}`);
-                if (getIndexOf(parsedEvent.id) >= 0) throw `trying to add pre-existing schedule for id ${parsedEvent.id} (user ${parseEvent.user}, superToken ${parsedEvent.superToken}, liquidityToken ${parsedEvent.liquidityToken})`;
+                const curIndex = getIndexOf(parsedEvent.id);
+                if (curIndex >= 0) {
+                    // the contract allows to call createWrapSchedule() again and treats it as update
+                    console.log(`  UPDATE: already existed, overwriting...`);
+                    // delete from active schedules, so we can just add with the new values witout creating a duplicate
+                    activeSchedules.splice(curIndex, 1);
+                }
 
                 // we define our own custom data structure for vesting schedules, containing just what we need
                 activeSchedules.push({
@@ -161,7 +167,7 @@ async function run() {
                 const parsedEvent = parseEvent(wrapMgr, e);
                 console.log(`DELETED: ${JSON.stringify(parsedEvent, null, 2)}`);
                 const curIndex = getIndexOf(parsedEvent.id);
-                if (curIndex == -1) throw `trying to delete schedule which doesn't exist: id ${parsedEvent.id} (user ${parseEvent.user}, superToken ${parsedEvent.superToken}, liquidityToken ${parsedEvent.liquidityToken})`;
+                if (curIndex == -1) throw `trying to delete schedule which doesn't exist: id ${parsedEvent.id} (user ${parsedEvent.user}, superToken ${parsedEvent.superToken}, liquidityToken ${parsedEvent.liquidityToken})`;
                 removedSchedules.push(activeSchedules[curIndex]);
                 activeSchedules.splice(curIndex, 1);
             },

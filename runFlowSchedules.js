@@ -132,7 +132,12 @@ async function run() {
 
                 console.log(`CREATED ${JSON.stringify(parsedEvent, null, 2)}`);
                 const curIndex = getIndexOf(parsedEvent.superToken, parsedEvent.sender, parsedEvent.receiver);
-                if (curIndex >= 0) throw `trying to add pre-existing schedule for ${parsedEvent.superToken} ${parsedEvent.sender} ${parsedEvent.receiver}`;
+                if (curIndex >= 0) {
+                    // the contract allows to call createFlowSchedule() again and treats it as update
+                    console.warn("  UPDATE: already existed, overwriting...");
+                    // delete from active schedules, so we can just add with the new values witout creating a duplicate
+                    activeSchedules.splice(curIndex, 1);
+                }
 
                 // we define our own custom data structure for flow schedules, containing just what we need
                 activeSchedules.push({
@@ -155,12 +160,14 @@ async function run() {
             handleFlowScheduleDeleted: function(e) {
                 const parsedEvent = parseEvent(fSched, e);
                 console.log(`DELETED: ${JSON.stringify(parsedEvent, null, 2)}`);
-                // assert that the schedule exists
-                // delete it
+
                 const curIndex = getIndexOf(parsedEvent.superToken, parsedEvent.sender, parsedEvent.receiver);
-                if (curIndex == -1) throw `trying to delete schedule which doesn't exist: ${parsedEvent.superToken} ${parsedEvent.sender} ${parsedEvent.receiver}`;
-                removedSchedules.push(activeSchedules[curIndex]);
-                activeSchedules.splice(curIndex, 1);
+                if (curIndex == -1) {
+                    console.warn("  DELETE: deleting a schedule which does not/nomore exist");
+                } else {
+                    removedSchedules.push(activeSchedules[curIndex]);
+                    activeSchedules.splice(curIndex, 1);
+                }
             },
 
             handleCreateFlowExecuted: function(e) {

@@ -20,9 +20,9 @@
   integrity sha512-MVC8EAQp7MvEcm30KWENFjgR+Mkmf+D189XJTkFIlwohU5hcBbn1ZkKq7KVTi2Hme3PMGF390DaL52beVrIihQ==
 
 "@superfluid-finance/metadata@^1.1.21":
-  version "1.1.21"
-  resolved "https://registry.yarnpkg.com/@superfluid-finance/metadata/-/metadata-1.1.21.tgz#fae74b000c6cf5445a5b5acfe9366003e2b7bbe5"
-  integrity sha512-ZWFQNF9BtdgvN9mmMz0JZVV/xhDiE4fg34Qln9myjx+zZHwWl3Sv8pUZIPDg/HY9n3smRpVadrbsSZO/yqGVwQ==
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@superfluid-finance/metadata/-/metadata-1.2.1.tgz#ef313bb38f2c7845a246f594c529b6ee0a53b2dd"
+  integrity sha512-d+f/LgP0SfLi2b95MKrAK3czGMvj9KjxrAIkBmDQjhFll8CN3Vg980Pthgc8Vv9KrEP/R9GGy6/2/DRuatNdfQ==
 
 "@types/node@18.15.13":
   version "18.15.13"

@@ -57,8 +57,8 @@ async function run() {
     const stateFileName = `data/vestingschedules_${network.name}.json`;
     if (fs.existsSync(stateFileName)) {
         const state = JSON.parse(fs.readFileSync(stateFileName));
-        console.log(`init: loaded state from file - startBlock: ${state.lastBlock}, activeSchedules: ${state.activeSchedules.length}, removedSchedules: ${state.removedSchedules.length}`);
-        startBlock = state.lastBlock;
+        console.log(`init: loaded state from file - lastBlock: ${state.lastBlock}, activeSchedules: ${state.activeSchedules.length}, removedSchedules: ${state.removedSchedules.length}`);
+        startBlock = state.lastBlock + 1;
         activeSchedules = state.activeSchedules;
         removedSchedules = state.removedSchedules;
     } else {

@@ -12,6 +12,11 @@ Run vesting schedules:
 RPC=<url> PRIVKEY=<pk> node runVestingSchules.js
 ```
 
+Run vesting schedules v2:
+```
+USE_V2=true RPC=<url> PRIVKEY=<pk> node runVestingSchules.js
+```
+
 Run flow schedules:
 ```
 RPC=<url> PRIVKEY=<pk> node runFlowSchules.js

@@ -2,6 +2,7 @@ const fs = require("fs");
 const { ethers } = require("ethers");
 const sfMeta = require("@superfluid-finance/metadata")
 const VestingSchedulerAbi = require("./VestingSchedulerAbi.json");
+const VestingSchedulerV2Abi = require("./VestingSchedulerV2Abi.json");
 
 const privKey = process.env.PRIVKEY;
 if (!privKey) throw "missing PRIVKEY env var";
@@ -10,6 +11,7 @@ const rpcUrl = process.env.RPC;
 if (!rpcUrl) throw "missing RPC env var";
 
 const vSchedAddrOverride = process.env.VSCHED_ADDR; // default: get from metadata
+const useV2 = process.env.USE_V2 ? process.env.USE_V2 === "true" : false;
 
 // where to start when no state is persisted. Defaults to protocol deployment block
 // which can be long before scheduler contract deployment, thus take unnecessarily long to bootstrap.
@@ -44,9 +46,10 @@ async function run() {
 
     console.log(`init: signer account: ${signer.address}`);
 
-    const vSchedAddr = vSchedAddrOverride || network.contractsV1.vestingScheduler;
-    if (!vSchedAddr) throw `no VestingScheduler address provided or found in metadata for network ${network.name}`;
-    const vSched = new ethers.Contract(vSchedAddr, VestingSchedulerAbi, provider);
+    const vSchedAddr = vSchedAddrOverride || (useV2 ? network.contractsV1.vestingSchedulerV2 : network.contractsV1.vestingScheduler);
+    console.log(`init: using VestingScheduler${useV2 ? "V2" : ""} address ${vSchedAddr}`);
+    if (!vSchedAddr) throw `no VestingScheduler${useV2 ? "V2" : ""} address provided or found in metadata for network ${network.name}`;
+    const vSched = new ethers.Contract(vSchedAddr, (useV2 ? VestingSchedulerV2Abi : VestingSchedulerAbi), provider);
 
     // relevant only when starting from scratch, without persisted state
     let startBlock = initStartBlockOverride || network.startBlockV1;
@@ -54,7 +57,7 @@ async function run() {
     let removedSchedules = [];
 
     // load persisted state
-    const stateFileName = `data/vestingschedules_${network.name}.json`;
+    const stateFileName = `data/vestingschedules${useV2 ? "v2" : ""}_${network.name}.json`;
     if (fs.existsSync(stateFileName)) {
         const state = JSON.parse(fs.readFileSync(stateFileName));
         console.log(`init: loaded state from file - lastBlock: ${state.lastBlock}, activeSchedules: ${state.activeSchedules.length}, removedSchedules: ${state.removedSchedules.length}`);
@@ -95,6 +98,7 @@ async function run() {
             startDate: parsedLog.args.startDate !== undefined ? parseInt(parsedLog.args.startDate) : undefined,
             cliffDate: parsedLog.args.cliffDate !== undefined ? parseInt(parsedLog.args.cliffDate) : undefined,
             endDate: parsedLog.args.endDate !== undefined ? parseInt(parsedLog.args.endDate) : undefined,
+            claimValidityDate: parsedLog.args.claimValidityDate !== undefined ? parseInt(parsedLog.args.claimValidityDate) : undefined,
             // metadata
             blockNumber: event.blockNumber,
             transactionHash: event.transactionHash
@@ -129,7 +133,6 @@ async function run() {
         const eventHandlerFunctions = {
             handleVestingScheduleCreated: function(e) {
                 //console.log(`created event ${JSON.stringify(e, null, 2)}`);
-                //const parsedEvent = vSched.interface.parseLog(e);
                 const parsedEvent = parseEvent(vSched, e);
 
                 console.log(`CREATED ${JSON.stringify(parsedEvent, null, 2)}`);
@@ -145,6 +148,8 @@ async function run() {
                     // start & end date tell us when to act
                     startDate /*cliffAndFlowDate in contract*/: parsedEvent.cliffDate == 0 ? parsedEvent.startDate : parsedEvent.cliffDate,
                     endDate: parsedEvent.endDate,
+                    // present only in v2. If set to non-zero, vesting starts by the receiver claiming
+                    claimValidityDate: parsedEvent.claimValidityDate,
                     // our meta state, to be updated by consecutive events
                     started: false,
                     stopped: false,
@@ -243,7 +248,9 @@ async function run() {
     const endDateValidBefore = parseInt(await vSched.END_DATE_VALID_BEFORE());
     console.log(`*** blockTime: ${blockTime}, startDateValidAfter: ${startDateValidAfter}, endDateValidBefore: ${endDateValidBefore}, executionDelay: ${executionDelayS} s`);
 
-    const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime);
+    // v2 added claimValidityDate, thus it's not set for v1 schedules. If set and != 0, it's up to the receiver to start the vesting.
+    const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime
+        && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
     console.log(`${toBeStarted.length} of ${activeSchedules.length} schedules to be started`);
 
     const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate + executionDelayS - endDateValidBefore <= blockTime);

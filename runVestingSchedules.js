@@ -3,6 +3,7 @@ const { ethers } = require("ethers");
 const sfMeta = require("@superfluid-finance/metadata")
 const VestingSchedulerAbi = require("./VestingSchedulerAbi.json");
 const VestingSchedulerV2Abi = require("./VestingSchedulerV2Abi.json");
+const axios = require('axios');
 
 const privKey = process.env.PRIVKEY;
 if (!privKey) throw "missing PRIVKEY env var";
@@ -27,6 +28,32 @@ const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.e
 
 const executionDelayS = process.env.EXECUTION_DELAY ? parseInt(process.env.EXECUTION_DELAY) : 0;
 
+const ALLOWLIST_URL = process.env.ALLOWLIST_URL || 'https://allowlist.superfluid.dev/api/_allowlist';
+const ALLOWLIST_FILE = 'data/allowlist_vesting.json';
+const ENFORCE_ALLOWLIST = process.env.ENFORCE_ALLOWLIST ? process.env.ENFORCE_ALLOWLIST === "true" : false;
+
+async function fetchAllowlist() {
+    try {
+        const response = await axios.get(ALLOWLIST_URL);
+        if (response.data && response.data.entries) {
+            fs.writeFileSync(ALLOWLIST_FILE, JSON.stringify(response.data, null, 2));
+            return response.data.entries;
+        }
+        throw new Error('Invalid allowlist data');
+    } catch (error) {
+        console.warn(`Failed to fetch allowlist: ${error.message}`);
+        if (fs.existsSync(ALLOWLIST_FILE)) {
+            console.log('Using previously saved allowlist');
+            return JSON.parse(fs.readFileSync(ALLOWLIST_FILE)).entries;
+        }
+        throw new Error('No valid allowlist available');
+    }
+}
+
+function isAllowed(account, chainId, allowlist) {
+    const entry = allowlist.find(e => e.wallet.toLowerCase() === account.toLowerCase());
+    return entry && entry.chains.includes(chainId);
+}
 
 async function run() {
     // =====================================
@@ -248,6 +275,19 @@ async function run() {
     const endDateValidBefore = parseInt(await vSched.END_DATE_VALID_BEFORE());
     console.log(`*** blockTime: ${blockTime}, startDateValidAfter: ${startDateValidAfter}, endDateValidBefore: ${endDateValidBefore}, executionDelay: ${executionDelayS} s`);
 
+    let allowlist = [];
+    try {
+        allowlist = await fetchAllowlist();
+        console.log(`Fetched allowlist with ${allowlist.length} entries | allowlist enforcement: ${ENFORCE_ALLOWLIST}`);
+    } catch (error) {
+        if (ENFORCE_ALLOWLIST) {
+            console.error(`Failed to fetch allowlist and enforcement is required: ${error.message}`);
+            throw error;
+        } else {
+            console.warn(`Failed to fetch allowlist, but enforcement is not required. Proceeding with empty allowlist: ${error.message}`);
+        }
+    }
+
     // v2 added claimValidityDate, thus it's not set for v1 schedules. If set and != 0, it's up to the receiver to start the vesting.
     const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime
         && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
@@ -259,6 +299,13 @@ async function run() {
     for (let i = 0; i < toBeStarted.length; i++) {
         const s = toBeStarted[i];
         console.log(`processing{start} ${JSON.stringify(s, null, 2)}`);
+
+        if (!isAllowed(s.sender, chainId, allowlist)) {
+            console.warn(`### Sender ${s.sender} not in allowlist for chain ${chainId}`);
+            if (ENFORCE_ALLOWLIST) {
+                continue;
+            }
+        }
 
         const dueSinceS = blockTime - s.startDate;
         console.log(`dueSinceS: ${dueSinceS}`);
@@ -289,6 +336,13 @@ async function run() {
     for (let i = 0; i < toBeStopped.length; i++) {
         const s = toBeStopped[i];
         console.log(`processing{stop} ${JSON.stringify(s, null, 2)}`);
+
+        if (!isAllowed(s.sender, chainId, allowlist)) {
+            console.warn(`### Sender ${s.sender} not in allowlist for chain ${chainId}`);
+            if (ENFORCE_ALLOWLIST) {
+                continue;
+            }
+        }
 
         // sanity check
         const curState = await vSched.getVestingSchedule(s.superToken, s.sender, s.receiver);

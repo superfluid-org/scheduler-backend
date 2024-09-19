@@ -3,13 +3,23 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "START_BLOCK=15472232 hardhat test",
+    "vesting": "node runVestingSchedules.js",
+    "flow": "node runFlowSchedules.js",
+    "wrap": "node runWrapSchedules.js"
   },
-  "author": "",
   "license": "ISC",
   "dependencies": {
     "@superfluid-finance/metadata": "^1.5.0",
     "axios": "^1.7.7",
-    "ethers": "^6.9.0"
+    "chai": "4.3.4",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.2"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-waffle": "^2.0.6",
+    "hardhat": "^2.22.10"
   }
 }

@@ -18,6 +18,8 @@ async function initProvider() {
     return { provider, chainId };
 }
 
+const bigIntToStr = (key, value) => (typeof value === 'bigint' ? value.toString() : value);
+
 async function initSigner(provider) {
     const privKey = process.env.PRIVKEY;
     if (!privKey) throw "missing PRIVKEY env var";
@@ -30,6 +32,7 @@ async function initSigner(provider) {
 }
 
 function getNetwork(chainId) {
+    console.log("ChainId type:", typeof chainId, "value:", chainId);
     const network = sfMeta.getNetworkByChainId(chainId);
     if (!network) throw `no network found for chainId ${chainId}`;
     console.log(`init: network ${network.name}`);
@@ -82,23 +85,6 @@ async function getEventsInRange(contract, event, start, end) {
     return await contract.queryFilter(filter, start, end);
 }
 
-function parseEvent(contract, event) {
-    if (event.removed) throw "### removed flag true - handling for this is not implemented";
-
-    const eventSignature = event.topics[0];
-    const eventFragment = contract.interface.getEvent(eventSignature);
-    const eventName = eventFragment.name;
-
-    const parsedLog = contract.interface.parseLog(event);
-
-    return {
-        name: eventName,
-        ...parsedLog.args,
-        blockNumber: event.blockNumber,
-        transactionHash: event.transactionHash
-    };
-}
-
 function saveState(stateFileName, lastBlock, activeSchedules, removedSchedules) {
     fs.writeFileSync(stateFileName, JSON.stringify({
         lastBlock,
@@ -107,7 +93,7 @@ function saveState(stateFileName, lastBlock, activeSchedules, removedSchedules) 
     }, null, 2));
 }
 
-async function syncState(scheduler, startBlock, endBlock, logsQueryRange, activeSchedules, removedSchedules, eventHandlers, stateFileName) {
+async function syncState(scheduler, startBlock, endBlock, logsQueryRange, activeSchedules, removedSchedules, parseEvent, eventHandlers, stateFileName) {
     for (let fromBlock = startBlock; fromBlock <= endBlock; fromBlock += logsQueryRange) {
         const toBlock = Math.min(fromBlock + logsQueryRange - 1, endBlock);
 
@@ -119,12 +105,14 @@ async function syncState(scheduler, startBlock, endBlock, logsQueryRange, active
         for (const filter of filters) {
             const events = await scheduler.queryFilter(filter, fromBlock, toBlock);
             newEvents = newEvents.concat(events);
+            //console.log(`new events detail: ${JSON.stringify(events, null, 2)}`);
         }
 
         console.log(`*** query for past events from ${fromBlock} to ${toBlock} (of ${endBlock}) returned ${newEvents.length} events`);
 
         newEvents.forEach(e => {
             const parsedEvent = parseEvent(scheduler, e);
+            console.log(`parsedEvent detail: ${JSON.stringify(parsedEvent, bigIntToStr, 2)}`);
             eventHandlers[parsedEvent.name](parsedEvent, activeSchedules, removedSchedules);
         });
 
@@ -167,7 +155,6 @@ module.exports = {
     isAllowed,
     loadState,
     getEventsInRange,
-    parseEvent,
     saveState,
     ENFORCE_ALLOWLIST,
     syncState,

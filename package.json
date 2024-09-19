@@ -4,9 +4,9 @@
   "description": "",
   "scripts": {
     "test": "START_BLOCK=15472232 hardhat test",
-    "vesting": "node runVestingSchedules.js",
-    "flow": "node runFlowSchedules.js",
-    "wrap": "node runWrapSchedules.js"
+    "vesting": "node src/runVestingSchedules.js",
+    "flow": "node src/runFlowSchedules.js",
+    "wrap": "node src/runWrapSchedules.js"
   },
   "license": "ISC",
   "dependencies": {

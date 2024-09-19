@@ -7,6 +7,17 @@ const ALLOWLIST_URL = process.env.ALLOWLIST_URL || 'https://allowlist.superfluid
 const ALLOWLIST_FILE = 'data/allowlist.json';
 const ENFORCE_ALLOWLIST = process.env.ENFORCE_ALLOWLIST ? process.env.ENFORCE_ALLOWLIST === "true" : false;
 
+// chainId to startBlock mapping for known deployments
+const startBlockMapping = {
+    100: 25992375, // xdai-mainnet
+    137: 33383487, // polygon-mainnet
+    10: 67820482,  // optimism-mainnet
+    42161: 53448990, // arbitrum-one
+    43114: 25012325, // avalanche-c
+    1: 16418958,   // eth-mainnet
+    8453: 13848318  // base-mainnet
+};
+
 async function initProvider() {
     const rpcUrl = process.env.RPC;
     if (!rpcUrl) throw "missing RPC env var";
@@ -63,7 +74,7 @@ function isAllowed(account, chainId, allowlist) {
 }
 
 async function loadState(stateFileName, network, initStartBlockOverride) {
-    let startBlock = initStartBlockOverride || network.startBlockV1;
+    let startBlock = initStartBlockOverride || startBlockMapping[network.chainId] || network.startBlockV1;
     let activeSchedules = [];
     let removedSchedules = [];
 
@@ -145,6 +156,16 @@ async function loadAllowlist() {
         }
     }
     return allowlist;
+}
+
+// returns the receipt
+async function executeTx(contract, signer, methodName, params) {
+    const method = contract[methodName];
+    const estGasLimit = await method.estimateGas(...Object.values(params), { from: signer.address });
+    const gasLimit = estGasLimit * BigInt(140) / BigInt(100); // increase by 40%
+    const tx = await contract.connect(signer)[methodName](...Object.values(params), { gasLimit });
+    console.log(`+++ waiting for tx ${tx.hash}`);
+    return await tx.wait();
 }
 
 module.exports = {

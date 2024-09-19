@@ -54,65 +54,74 @@ function parseEvent(contract, event) {
 
 const eventHandlers = {
     VestingScheduleCreated: (e, activeSchedules) => {
-        const i = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
-        if (i >= 0) throw `schedule already exists for ${e.superToken} ${e.sender} ${e.receiver}`;
+        console.log(`CREATED ${JSON.stringify(e, null, 2)}`);
+        const curIndex = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
+        if (curIndex >= 0) throw `schedule already exists for ${e.superToken} ${e.sender} ${e.receiver}`;
+
         activeSchedules.push({
             superToken: e.superToken,
             sender: e.sender,
             receiver: e.receiver,
-            startDate: parseInt(e.startDate),
-            endDate: parseInt(e.endDate),
-            cliffDate: parseInt(e.cliffDate),
-            startAmount: e.startAmount,
-            receiver: e.receiver,
-            cliffAmount: e.cliffAmount,
-            flowRate: e.flowRate,
-            userData: e.userData,
+            // start & end date tell us when to act
+            startDate /*cliffAndFlowDate in contract*/: e.cliffDate == 0 ? e.startDate : e.cliffDate,
+            endDate: e.endDate,
+            // present only in v2. If set to non-zero, vesting starts by the receiver claiming
+            claimValidityDate: e.claimValidityDate,
+            // our meta state, to be updated by consecutive events
             started: false,
-            stopped: false
+            stopped: false,
+            failed: false
         });
     },
     VestingScheduleUpdated: (e, activeSchedules) => {
-        const i = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
-        if (i < 0) throw `schedule not found for ${e.superToken} ${e.sender} ${e.receiver}`;
-        activeSchedules[i] = {
-            ...activeSchedules[i],
-            endDate: parseInt(e.endDate),
-            cliffDate: parseInt(e.cliffDate),
-            cliffAmount: e.cliffAmount,
-            flowRate: e.flowRate,
-            userData: e.userData
-        };
+        // assert that the schedule exists
+        const curIndex = getIndexOf(e.superToken, e.sender, e.receiver);
+        if (curIndex == -1) throw `trying to update schedule which doesn't exist: ${e.superToken} ${e.sender} ${e.receiver}`;
+        const prevEndDate = activeSchedules[curIndex].endDate;
+        // assertion
+        if (prevEndDate != e.endDate) throw `mismatch of old endDate for ${e.superToken} ${e.sender} ${e.receiver} | persisted ${prevEndDate}, in event ${e.endDate}`;
+        
+        activeSchedules[curIndex].endDate = e.endDate;
+        console.log(`UPDATED: endDate ${e.endDate} for ${e.superToken} ${e.sender} ${e.receiver}`);
     },
     VestingScheduleDeleted: (e, activeSchedules, removedSchedules) => {
-        const i = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
-        if (i < 0) throw `schedule not found for ${e.superToken} ${e.sender} ${e.receiver}`;
-        const removed = activeSchedules.splice(i, 1)[0];
-        removedSchedules.push(removed);
+        console.log(`DELETED: ${JSON.stringify(e, null, 2)}`);
+        const curIndex = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
+        if (curIndex == -1) throw `trying to delete schedule which doesn't exist: ${e.superToken} ${e.sender} ${e.receiver}`;
+
+        removedSchedules.push(activeSchedules[curIndex]);
+        activeSchedules.splice(curIndex, 1);
     },
     VestingCliffAndFlowExecuted: (e, activeSchedules) => {
-        const i = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
-        if (i < 0) throw `schedule not found for ${e.superToken} ${e.sender} ${e.receiver}`;
-        activeSchedules[i].started = true;
+        console.log(`STARTED: ${e.superToken} ${e.sender} ${e.receiver}`);
+        const curIndex = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
+        if (curIndex == -1) throw `trying to start schedule which doesn't exist: ${e.superToken} ${e.sender} ${e.receiver}`;
+
+        activeSchedules[curIndex].started = true;
     },
     VestingEndExecuted: (e, activeSchedules, removedSchedules) => {
-        const i = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
-        if (i < 0) throw `schedule not found for ${e.superToken} ${e.sender} ${e.receiver}`;
-        const removed = activeSchedules.splice(i, 1)[0];
-        removed.stopped = true;
-        removedSchedules.push(removed);
+        console.log(`STOPPED: ${e.superToken} ${e.sender} ${e.receiver}`);
+        const curIndex = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
+        if (curIndex == -1) throw `trying to stop schedule which doesn't exist: ${e.superToken} ${e.sender} ${e.receiver}`;
+
+        activeSchedules[curIndex].stopped = true;
+        removedSchedules.push(activeSchedules[curIndex]);
+        activeSchedules.splice(curIndex, 1);
     },
     VestingEndFailed: (e, activeSchedules, removedSchedules) => {
-        const i = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
-        if (i < 0) throw `schedule not found for ${e.superToken} ${e.sender} ${e.receiver}`;
-        const removed = activeSchedules.splice(i, 1)[0];
-        removed.stopped = true;
-        removedSchedules.push(removed);
+        console.log(`FAILED: ${e.superToken} ${e.sender} ${e.receiver}`);
+        const curIndex = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
+        if (curIndex == -1) throw `trying to stop schedule which doesn't exist: ${e.superToken} ${e.sender} ${e.receiver}`;
+
+        activeSchedules[curIndex].failed = true;
+        removedSchedules.push(activeSchedules[curIndex]);
+        activeSchedules.splice(curIndex, 1);
     }
 };
 
 async function processVestingSchedules(vSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS) {
-    const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime);
+    const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime
+        && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
     const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime);
 
     console.log(`${toBeStarted.length} schedules to be started, ${toBeStopped.length} to be stopped`);
@@ -125,11 +134,7 @@ async function processStart(vSched, signer, s) {
     console.log(`processing{start} ${JSON.stringify(s, null, 2)}`);
     try {
         console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
-        const estGasLimit = await vSched.executeCliffAndFlow.estimateGas(s.superToken, s.sender, s.receiver, { from: signer.address });
-        const gasLimit = estGasLimit * BigInt(140) / BigInt(100); // increase by 40%
-        const tx = await vSched.connect(signer).executeCliffAndFlow(s.superToken, s.sender, s.receiver, { gasLimit });
-        console.log(`+++ waiting for tx ${tx.hash}`);
-        const receipt = await tx.wait();
+        const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
         console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
     } catch(e) {
         console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
@@ -140,11 +145,7 @@ async function processStop(vSched, signer, s) {
     console.log(`processing{stop} ${JSON.stringify(s, null, 2)}`);
     try {
         console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver}`);
-        const estGasLimit = await vSched.executeEndVesting.estimateGas(s.superToken, s.sender, s.receiver, { from: signer.address });
-        const gasLimit = estGasLimit * BigInt(140) / BigInt(100); // increase by 40%
-        const tx = await vSched.connect(signer).executeEndVesting(s.superToken, s.sender, s.receiver, { gasLimit });
-        console.log(`+++ waiting for tx ${tx.hash}`);
-        const receipt = await tx.wait();
+        const receipt = await common.executeTx(vSched, signer, "executeEndVesting", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
         console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
     } catch(e) {
         console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);

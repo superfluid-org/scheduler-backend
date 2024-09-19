@@ -12,13 +12,8 @@ const dataDir = process.env.DATA_DIR || "data";
 
 async function initVestingScheduler(network, provider) {
     const vSchedAddr = vSchedAddrOverride || (useV2 ? network.contractsV1.vestingSchedulerV2 : network.contractsV1.vestingScheduler);
-    if (!vSchedAddr) {
-        console.error(`No VestingScheduler${useV2 ? "V2" : ""} address provided or found in metadata for network ${network.name}`);
-        console.error(`Network metadata:`, JSON.stringify(network, null, 2));
-        throw new Error(`Missing VestingScheduler address for network ${network.name}`);
-    }
+    if (!vSchedAddr) throw `no VestingScheduler${useV2 ? "V2" : ""} address provided or found in metadata for network ${network.name}`;
     console.log(`Using VestingScheduler address: ${vSchedAddr}`);
-
     return new ethers.Contract(vSchedAddr, VestingSchedulerAbi, provider);
 }
 
@@ -160,9 +155,6 @@ async function run(customProvider, impersonatedSigner, dataDirOverride) {
         
         const signer = impersonatedSigner || await common.initSigner(provider);
         const network = common.getNetwork(chainId);
-
-        console.log(`init: network ${network.name}`);
-        console.log(`init: signer account: ${await signer.getAddress()}`);
 
         const vSched = await initVestingScheduler(network, provider);
 

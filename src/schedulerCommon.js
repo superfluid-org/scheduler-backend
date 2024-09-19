@@ -108,16 +108,16 @@ async function syncState(scheduler, startBlock, endBlock, logsQueryRange, active
     for (let fromBlock = startBlock; fromBlock <= endBlock; fromBlock += logsQueryRange) {
         const toBlock = Math.min(fromBlock + logsQueryRange - 1, endBlock);
 
-        const filters = Object.keys(eventHandlers).map(eventName => 
-            scheduler.filters[eventName]()
+        // Create a single array of topic filters
+        const filters = await Promise.all(
+            Object.keys(eventHandlers).map(async (eventName) => 
+                await scheduler.filters[eventName]().getTopicFilter()
+            )
         );
+        // Flatten the inner arrays into a single array
+        const filter = [filters.flat()];
 
-        let newEvents = [];
-        for (const filter of filters) {
-            const events = await scheduler.queryFilter(filter, fromBlock, toBlock);
-            newEvents = newEvents.concat(events);
-            //console.log(`new events detail: ${JSON.stringify(events, null, 2)}`);
-        }
+        const newEvents = await scheduler.queryFilter(filter, fromBlock, toBlock);
 
         console.log(`*** query for past events from ${fromBlock} to ${toBlock} (of ${endBlock}) returned ${newEvents.length} events`);
 
@@ -180,5 +180,6 @@ module.exports = {
     ENFORCE_ALLOWLIST,
     syncState,
     processSchedulesWithAllowlist,
-    loadAllowlist
+    loadAllowlist,
+    executeTx
 };

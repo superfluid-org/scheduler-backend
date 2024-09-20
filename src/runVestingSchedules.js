@@ -10,6 +10,9 @@ const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.e
 const executionDelayS = process.env.EXECUTION_DELAY ? parseInt(process.env.EXECUTION_DELAY) : 0;
 const dataDir = process.env.DATA_DIR || "data";
 
+let startDateValidAfter = 0;
+let endDateValidBefore = 0;
+
 async function initVestingScheduler(network, provider) {
     const vSchedAddr = vSchedAddrOverride || (useV2 ? network.contractsV1.vestingSchedulerV2 : network.contractsV1.vestingScheduler);
     if (!vSchedAddr) throw `no VestingScheduler${useV2 ? "V2" : ""} address provided or found in metadata for network ${network.name}`;
@@ -117,7 +120,7 @@ const eventHandlers = {
 async function processVestingSchedules(vSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS) {
     const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime
         && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
-    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime);
+    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate + executionDelayS- endDateValidBefore <= blockTime);
 
     console.log(`${toBeStarted.length} schedules to be started, ${toBeStopped.length} to be stopped`);
 
@@ -127,23 +130,39 @@ async function processVestingSchedules(vSched, signer, activeSchedules, allowlis
 
 async function processStart(vSched, signer, s) {
     console.log(`processing{start} ${JSON.stringify(s, null, 2)}`);
-    try {
-        console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
-        const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
-        console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
-    } catch(e) {
-        console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
+    const blockTime = parseInt((await provider.getBlock()).timestamp);
+    const dueSinceS = blockTime - s.startDate;
+    console.log(`dueSinceS: ${dueSinceS}`);
+    if (dueSinceS > startDateValidAfter) {
+        console.warn(`### start time window missed for ${s.superToken} ${s.sender} ${s.receiver} by ${dueSinceS - startDateValidAfter} s, skipping`);// TODO: could be removed from state once we're sure about it
+        } else {
+        try {
+            console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
+            const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
+            console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
+        } catch(e) {
+            console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
+        }
     }
 }
 
 async function processStop(vSched, signer, s) {
     console.log(`processing{stop} ${JSON.stringify(s, null, 2)}`);
-    try {
-        console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver}`);
-        const receipt = await common.executeTx(vSched, signer, "executeEndVesting", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
-        console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
-    } catch(e) {
-        console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
+    const blockTime = parseInt((await signer.provider.getBlock()).timestamp);
+    // sanity check
+    const curState = await vSched.getVestingSchedule(s.superToken, s.sender, s.receiver);
+    if (s.endDate != parseInt(curState.endDate)) throw `state mismatch for ${s.superToken} ${s.sender} ${s.receiver} | contract endDate: ${curState.endDate.toString()}, persisted endDate ${curState.endDate}`;
+
+    if (blockTime > s.endDate) {
+        console.warn(`!!! stopping overdue, end time missed for ${s.superToken} ${s.sender} ${s.receiver} by ${blockTime - s.endDate} s !!!`);
+    } else {
+        try {
+            console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver}`);
+            const receipt = await common.executeTx(vSched, signer, "executeEndVesting", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
+            console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
+        } catch(e) {
+            console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
+        }
     }
 }
 
@@ -168,7 +187,9 @@ async function run(customProvider, impersonatedSigner, dataDirOverride) {
         await common.syncState(vSched, startBlock, endBlock, logsQueryRange, activeSchedules, removedSchedules, parseEvent, eventHandlers, stateFileName);
 
         const blockTime = parseInt((await provider.getBlock()).timestamp);
-        console.log(`*** blockTime: ${blockTime}, executionDelay: ${executionDelayS} s`);
+        startDateValidAfter = parseInt(await vSched.START_DATE_VALID_AFTER());
+        endDateValidBefore = parseInt(await vSched.END_DATE_VALID_BEFORE());
+        console.log(`*** blockTime: ${blockTime}, startDateValidAfter: ${startDateValidAfter}, endDateValidBefore: ${endDateValidBefore}, executionDelay: ${executionDelayS} s`);
 
         const allowlist = await common.loadAllowlist();
 

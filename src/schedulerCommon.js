@@ -15,7 +15,8 @@ const startBlockMapping = {
     42161: 53448990, // arbitrum-one
     43114: 25012325, // avalanche-c
     1: 16418958,   // eth-mainnet
-    8453: 13848318  // base-mainnet
+    8453: 13848318,  // base-mainnet
+    56: 24833789,   // bsc-mainnet
 };
 
 async function initProvider() {

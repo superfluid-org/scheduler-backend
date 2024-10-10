@@ -22,11 +22,11 @@ const startBlockMapping = {
 async function initProvider() {
     const rpcUrl = process.env.RPC;
     if (!rpcUrl) throw "missing RPC env var";
-    
+
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const chainId = parseInt((await provider.getNetwork()).chainId);
     console.log(`init: connected to network via RPC ${rpcUrl} with chainId ${chainId} at ${new Date()}`);
-    
+
     return { provider, chainId };
 }
 
@@ -35,11 +35,11 @@ const bigIntToStr = (key, value) => (typeof value === 'bigint' ? value.toString(
 async function initSigner(provider) {
     const privKey = process.env.PRIVKEY;
     if (!privKey) throw "missing PRIVKEY env var";
-    
+
     const wallet = new ethers.Wallet(privKey);
     const signer = wallet.connect(provider);
     console.log(`init: signer account: ${signer.address}`);
-    
+
     return signer;
 }
 
@@ -111,7 +111,7 @@ async function syncState(scheduler, startBlock, endBlock, logsQueryRange, active
 
         // Create a single array of topic filters
         const filters = await Promise.all(
-            Object.keys(eventHandlers).map(async (eventName) => 
+            Object.keys(eventHandlers).map(async (eventName) =>
                 await scheduler.filters[eventName]().getTopicFilter()
             )
         );
@@ -130,6 +130,7 @@ async function syncState(scheduler, startBlock, endBlock, logsQueryRange, active
 
         console.log(`*** have ${activeSchedules.length} schedules, ${removedSchedules.length} removed schedules`);
         saveState(stateFileName, toBlock, activeSchedules, removedSchedules);
+        return toBlock;
     }
 }
 

@@ -1,6 +1,7 @@
 const { ethers } = require("ethers");
 const common = require('./schedulerCommon');
 const FlowSchedulerAbi = require("./abis/FlowSchedulerAbi.json");
+const CFAv1ForwarderAbi = require("./abis/CFAv1ForwarderAbi.json");
 
 const fSchedAddrOverride = process.env.FSCHED_ADDR;
 const initStartBlockOverride = process.env.START_BLOCK ? parseInt(process.env.START_BLOCK) : undefined;
@@ -8,6 +9,9 @@ const endBlockOffset = process.env.END_BLOCK_OFFSET ? parseInt(process.env.END_B
 const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.env.LOGS_QUERY_RANGE) : undefined;
 const executionDelayS = process.env.EXECUTION_DELAY ? parseInt(process.env.EXECUTION_DELAY) : 0;
 const dataDir = process.env.DATA_DIR || "data";
+
+// TODO: refactor?
+let cfaFwd;
 
 async function initFlowScheduler(network, provider) {
     const fSchedAddr = fSchedAddrOverride || network.contractsV1.flowScheduler;
@@ -42,6 +46,7 @@ function parseEvent(contract, event) {
         receiver: parsedLog.args.receiver,
         // in some events
         startDate: parsedLog.args.startDate !== undefined ? parseInt(parsedLog.args.startDate) : undefined,
+        startMaxDelay: parsedLog.args.startMaxDelay !== undefined ? parseInt(parsedLog.args.startMaxDelay) : undefined,
         endDate: parsedLog.args.endDate !== undefined ? parseInt(parsedLog.args.endDate) : undefined,
         userData: parsedLog.args.userData !== undefined ? parsedLog.args.userData : undefined,
         // metadata
@@ -66,6 +71,7 @@ const eventHandlers = {
             receiver: e.receiver,
             // start & end date tell us when to act
             startDate: e.startDate,
+            startMaxDelay: e.startMaxDelay,
             endDate: e.endDate,
             userData: e.userData,
             // our meta state, to be updated by consecutive events
@@ -107,8 +113,39 @@ const eventHandlers = {
 };
 
 async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS) {
-    const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime);
-    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime);
+    const toBeStarted = activeSchedules
+        .filter(s => !s.started && !s.failed && s.startDate + executionDelayS <= blockTime)
+        /* If a flow failed to start, e.g. because of a lack of funds or permission, or automation failure,
+        it may eventually be out of the time window where starting is possible (according to `maxStartDelay` which is defined per schedule).
+        In that case we flag the schedule as failed in order to avoid eternal retrying. */
+        .map(s => {
+            const overdueSeconds = blockTime - s.startDate;
+            const overdueDays = Number(blockTime - s.startDate) / 86400;
+            if (overdueSeconds > s.startMaxDelay) {
+                console.log(`xxx toBeStarted failed ${s.superToken} ${s.sender} ${s.receiver} is ${overdueDays} days out of start time window`);
+                s.failed = true; // will this be persisted?
+                return null;
+            } else {
+                return s;
+            }
+        })
+        .filter(s => s !== null);
+
+    const toBeStopped = (await Promise.all(
+        activeSchedules
+            .filter(s => s.started && !s.stopped && !s.failed && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime)
+            .map(async s => {
+                /* Flows may have been stopped by sender or receiver, or have run out of funds.
+                Thus before attempting to stop we check if it actually exists. If not we just set the stopped flag. */
+                if (await cfaFwd.getFlowrate(s.superToken, s.sender, s.receiver) === 0n) {
+                    console.log(`xxx toBeStopped failed: ${s.superToken} ${s.sender} ${s.receiver} flow doesn't exist`);
+                    s.stopped = true;
+                    return null;
+                } else {
+                    return s;
+                }
+            }))
+        ).filter(s => s !== null);
 
     console.log(`${toBeStarted.length} flows to be started, ${toBeStopped.length} flows to be stopped`);
 
@@ -138,14 +175,15 @@ async function processStop(fSched, signer, s) {
 
 async function run(customProvider, impersonatedSigner, dataDirOverride) {
     try {
-        const { provider, chainId } = customProvider 
-            ? { provider: customProvider, chainId: Number((await customProvider.getNetwork()).chainId) } 
+        const { provider, chainId } = customProvider
+            ? { provider: customProvider, chainId: Number((await customProvider.getNetwork()).chainId) }
             : await common.initProvider();
-        
+
         const signer = impersonatedSigner || await common.initSigner(provider);
         const network = common.getNetwork(chainId);
 
         const fSched = await initFlowScheduler(network, provider);
+        cfaFwd = new ethers.Contract(network.contractsV1.cfaV1Forwarder, CFAv1ForwarderAbi, provider);
 
         const stateFileName = `${dataDirOverride || dataDir}/flowschedules_${network.name}.json`;
         console.log(`Using state file: ${stateFileName}`);
@@ -161,7 +199,8 @@ async function run(customProvider, impersonatedSigner, dataDirOverride) {
 
         const allowlist = await common.loadAllowlist();
 
-        await processFlowSchedules(fSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS);
+        const toBlock = await processFlowSchedules(fSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS);
+        await common.saveState(stateFileName, toBlock, activeSchedules, removedSchedules);
     } catch (error) {
         console.error("Error in run function:", error);
         throw error;

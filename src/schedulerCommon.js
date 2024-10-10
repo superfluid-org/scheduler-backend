@@ -106,8 +106,9 @@ function saveState(stateFileName, lastBlock, activeSchedules, removedSchedules) 
 }
 
 async function syncState(scheduler, startBlock, endBlock, logsQueryRange, activeSchedules, removedSchedules, parseEvent, eventHandlers, stateFileName) {
+    let toBlock;
     for (let fromBlock = startBlock; fromBlock <= endBlock; fromBlock += logsQueryRange) {
-        const toBlock = Math.min(fromBlock + logsQueryRange - 1, endBlock);
+        toBlock = Math.min(fromBlock + logsQueryRange - 1, endBlock);
 
         // Create a single array of topic filters
         const filters = await Promise.all(
@@ -130,8 +131,8 @@ async function syncState(scheduler, startBlock, endBlock, logsQueryRange, active
 
         console.log(`*** have ${activeSchedules.length} schedules, ${removedSchedules.length} removed schedules`);
         saveState(stateFileName, toBlock, activeSchedules, removedSchedules);
-        return toBlock;
     }
+    return toBlock;
 }
 
 async function processSchedulesWithAllowlist(scheduler, signer, activeSchedules, allowlist, chainId, processFunction) {

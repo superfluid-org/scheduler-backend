@@ -1,6 +1,7 @@
 const { ethers } = require("ethers");
 const common = require('./schedulerCommon');
 const VestingSchedulerAbi = require("./abis/VestingSchedulerAbi.json");
+const VestingSchedulerV2Abi = require("./abis/VestingSchedulerV2Abi.json");
 
 const vSchedAddrOverride = process.env.VSCHED_ADDR;
 const useV2 = process.env.USE_V2 ? process.env.USE_V2 === "true" : false;
@@ -17,7 +18,7 @@ async function initVestingScheduler(network, provider) {
     const vSchedAddr = vSchedAddrOverride || (useV2 ? network.contractsV1.vestingSchedulerV2 : network.contractsV1.vestingScheduler);
     if (!vSchedAddr) throw `no VestingScheduler${useV2 ? "V2" : ""} address provided or found in metadata for network ${network.name}`;
     console.log(`Using VestingScheduler address: ${vSchedAddr}`);
-    return new ethers.Contract(vSchedAddr, VestingSchedulerAbi, provider);
+    return new ethers.Contract(vSchedAddr, (useV2 ? VestingSchedulerV2Abi : VestingSchedulerAbi), provider);
 }
 
 function getIndexOf(activeSchedules, superToken, sender, receiver) {
@@ -78,7 +79,7 @@ const eventHandlers = {
         const prevEndDate = activeSchedules[curIndex].endDate;
         // assertion
         if (prevEndDate != e.endDate) throw `mismatch of old endDate for ${e.superToken} ${e.sender} ${e.receiver} | persisted ${prevEndDate}, in event ${e.endDate}`;
-        
+
         activeSchedules[curIndex].endDate = e.endDate;
         console.log(`UPDATED: endDate ${e.endDate} for ${e.superToken} ${e.sender} ${e.receiver}`);
     },
@@ -168,10 +169,10 @@ async function processStop(vSched, signer, s) {
 
 async function run(customProvider, impersonatedSigner, dataDirOverride) {
     try {
-        const { provider, chainId } = customProvider 
-            ? { provider: customProvider, chainId: Number((await customProvider.getNetwork()).chainId) } 
+        const { provider, chainId } = customProvider
+            ? { provider: customProvider, chainId: Number((await customProvider.getNetwork()).chainId) }
             : await common.initProvider();
-        
+
         const signer = impersonatedSigner || await common.initSigner(provider);
         const network = common.getNetwork(chainId);
 

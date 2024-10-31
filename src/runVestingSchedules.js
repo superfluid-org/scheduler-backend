@@ -131,7 +131,7 @@ async function processVestingSchedules(vSched, signer, activeSchedules, allowlis
 
 async function processStart(vSched, signer, s) {
     console.log(`processing{start} ${JSON.stringify(s, null, 2)}`);
-    const blockTime = parseInt((await provider.getBlock()).timestamp);
+    const blockTime = parseInt((await signer.provider.getBlock()).timestamp);
     const dueSinceS = blockTime - s.startDate;
     console.log(`dueSinceS: ${dueSinceS}`);
     if (dueSinceS > startDateValidAfter) {

@@ -1,0 +1,1301 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "host",
+        "type": "address",
+        "internalType": "contract ISuperfluid"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "END_DATE_VALID_BEFORE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "HOST",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract ISuperfluid"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_VESTING_DURATION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "START_DATE_VALID_AFTER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "accountings",
+    "inputs": [
+      {
+        "name": "vestingId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "settledAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "settledDate",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createAndExecuteVestingScheduleFromAmountAndDuration",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalDuration",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createVestingSchedule",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "startDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "flowRate",
+        "type": "int96",
+        "internalType": "int96"
+      },
+      {
+        "name": "cliffAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "endDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "claimValidityDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createVestingSchedule",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "startDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "flowRate",
+        "type": "int96",
+        "internalType": "int96"
+      },
+      {
+        "name": "cliffAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "endDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createVestingScheduleFromAmountAndDuration",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalDuration",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "startDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "claimPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createVestingScheduleFromAmountAndDuration",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalDuration",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "startDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "claimPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "deleteVestingSchedule",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "executeCliffAndFlow",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "executeEndVesting",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getMaximumNeededTokenAllowance",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "maxNeededAllowance",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getMaximumNeededTokenAllowance",
+    "inputs": [
+      {
+        "name": "schedule",
+        "type": "tuple",
+        "internalType": "struct IVestingSchedulerV3.VestingSchedule",
+        "components": [
+          {
+            "name": "cliffAndFlowDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "endDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "flowRate",
+            "type": "int96",
+            "internalType": "int96"
+          },
+          {
+            "name": "cliffAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "remainderAmount",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "claimValidityDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "maxNeededAllowance",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "getTotalVestedAmount",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "totalVestedAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getVestingSchedule",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "schedule",
+        "type": "tuple",
+        "internalType": "struct IVestingSchedulerV3.VestingSchedule",
+        "components": [
+          {
+            "name": "cliffAndFlowDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "endDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "flowRate",
+            "type": "int96",
+            "internalType": "int96"
+          },
+          {
+            "name": "cliffAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "remainderAmount",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "claimValidityDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isTrustedForwarder",
+    "inputs": [
+      {
+        "name": "forwarder",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "isForwarderTrusted",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "mapCreateVestingScheduleParams",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalDuration",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "startDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "claimPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct IVestingSchedulerV3.ScheduleCreationParams",
+        "components": [
+          {
+            "name": "superToken",
+            "type": "address",
+            "internalType": "contract ISuperToken"
+          },
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "receiver",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "startDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "claimValidityDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "cliffDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "flowRate",
+            "type": "int96",
+            "internalType": "int96"
+          },
+          {
+            "name": "cliffAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "endDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "remainderAmount",
+            "type": "uint96",
+            "internalType": "uint96"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "mapCreateVestingScheduleParams",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalDuration",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "startDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "claimPeriod",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct IVestingSchedulerV3.ScheduleCreationParams",
+        "components": [
+          {
+            "name": "superToken",
+            "type": "address",
+            "internalType": "contract ISuperToken"
+          },
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "receiver",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "startDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "claimValidityDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "cliffDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "flowRate",
+            "type": "int96",
+            "internalType": "int96"
+          },
+          {
+            "name": "cliffAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "endDate",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "remainderAmount",
+            "type": "uint96",
+            "internalType": "uint96"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "updateVestingSchedule",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "newEndDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateVestingScheduleFlowRateFromAmount",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "newTotalAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateVestingScheduleFlowRateFromAmountAndEndDate",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "newTotalAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newEndDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateVestingScheduleFlowRateFromEndDate",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "newEndDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "versionRecipient",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "version",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "vestingSchedules",
+    "inputs": [
+      {
+        "name": "vestingId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "cliffAndFlowDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "endDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "flowRate",
+        "type": "int96",
+        "internalType": "int96"
+      },
+      {
+        "name": "cliffAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "remainderAmount",
+        "type": "uint96",
+        "internalType": "uint96"
+      },
+      {
+        "name": "claimValidityDate",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "VestingClaimed",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "claimer",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VestingCliffAndFlowExecuted",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "cliffAndFlowDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "flowRate",
+        "type": "int96",
+        "indexed": false,
+        "internalType": "int96"
+      },
+      {
+        "name": "cliffAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "flowDelayCompensation",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VestingEndExecuted",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "endDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "earlyEndCompensation",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "didCompensationFail",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VestingEndFailed",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "endDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VestingScheduleCreated",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "startDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "flowRate",
+        "type": "int96",
+        "indexed": false,
+        "internalType": "int96"
+      },
+      {
+        "name": "endDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "cliffAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "claimValidityDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "remainderAmount",
+        "type": "uint96",
+        "indexed": false,
+        "internalType": "uint96"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VestingScheduleDeleted",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VestingScheduleUpdated",
+    "inputs": [
+      {
+        "name": "superToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract ISuperToken"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "endDate",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "remainderAmount",
+        "type": "uint96",
+        "indexed": false,
+        "internalType": "uint96"
+      },
+      {
+        "name": "flowRate",
+        "type": "int96",
+        "indexed": false,
+        "internalType": "int96"
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "settledAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AccountInvalid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AlreadyExecuted",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CFA_INVALID_FLOW_RATE",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CannotClaimScheduleOnBehalf",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CliffInvalid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FlowRateInvalid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidNewTotalAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ScheduleAlreadyExists",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ScheduleDoesNotExist",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ScheduleNotClaimed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ScheduleNotFlowing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TimeWindowInvalid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
+  }
+]

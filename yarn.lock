@@ -7,6 +7,11 @@
   resolved "https://registry.yarnpkg.com/@adraffy/ens-normalize/-/ens-normalize-1.10.1.tgz#63430d04bd8c5e74f8d7d049338f1cd9d4f02069"
   integrity sha512-96Z2IP3mYmF1Xg2cDm8f1gWGf/HUVedQ3FMifV4kG/PQ4yEP51xDtRAEfhVNt5f/uzpNkZHwWQuUcu6D6K+Ekw==
 
+"@d10r/metadata@^1.6.0":
+  version "1.6.0"
+  resolved "https://registry.yarnpkg.com/@d10r/metadata/-/metadata-1.6.0.tgz#7e8fcb95e03ef215707c49d73e448eb722e1c623"
+  integrity sha512-9vqYMh765QCPQAeukyQHgp0ypwTcYElO0x1ZivY1SDoIzX301hF78xpuiHaqoCvR1EI4Cy+0aGE+R6n+9amnYA==
+
 "@ethersproject/abi@^5.1.2":
   version "5.7.0"
   resolved "https://registry.yarnpkg.com/@ethersproject/abi/-/abi-5.7.0.tgz#b3f3e045bbbeed1af3947335c247ad625a44e449"
@@ -455,11 +460,6 @@
   dependencies:
     "@sentry/types" "5.30.0"
     tslib "^1.9.3"
-
-"@superfluid-finance/metadata@^1.5.1":
-  version "1.5.1"
-  resolved "https://registry.yarnpkg.com/@superfluid-finance/metadata/-/metadata-1.5.1.tgz#dd50feeb93145a0d23b48ede45e3f9f1896ff1e6"
-  integrity sha512-SyeY9MKUMklQfHTPadpquOX82+jWUjp3+xIhvi6xKXmHLG2Oif1I+ySW8GNY2PsOK8ItA2HITMt2UYMnNygyoA==
 
 "@types/bn.js@^4.11.3":
   version "4.11.6"

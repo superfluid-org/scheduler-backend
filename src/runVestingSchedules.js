@@ -2,9 +2,10 @@ const { ethers } = require("ethers");
 const common = require('./schedulerCommon');
 const VestingSchedulerAbi = require("./abis/VestingSchedulerAbi.json");
 const VestingSchedulerV2Abi = require("./abis/VestingSchedulerV2Abi.json");
+const VestingSchedulerV3Abi = require("./abis/VestingSchedulerV3Abi.json");
 
 const vSchedAddrOverride = process.env.VSCHED_ADDR;
-const useV2 = process.env.USE_V2 ? process.env.USE_V2 === "true" : false;
+const contractVersion = process.env.CONTRACT_VERSION ? parseInt(process.env.CONTRACT_VERSION) : 1;
 const initStartBlockOverride = process.env.START_BLOCK ? parseInt(process.env.START_BLOCK) : undefined;
 const endBlockOffset = process.env.END_BLOCK_OFFSET ? parseInt(process.env.END_BLOCK_OFFSET) : 30;
 const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.env.LOGS_QUERY_RANGE) : undefined;
@@ -14,11 +15,27 @@ const dataDir = process.env.DATA_DIR || "data";
 let startDateValidAfter = 0;
 let endDateValidBefore = 0;
 
+function getAbiForVersion(version) {
+    switch(version) {
+        case 3: return VestingSchedulerV3Abi;
+        case 2: return VestingSchedulerV2Abi;
+        default: return VestingSchedulerAbi;
+    }
+}
+
+function getContractAddressForVersion(network, version) {
+    switch(version) {
+        case 3: return network.contractsV1.vestingSchedulerV3;
+        case 2: return network.contractsV1.vestingSchedulerV2;
+        default: return network.contractsV1.vestingScheduler;
+    }
+}
+
 async function initVestingScheduler(network, provider) {
-    const vSchedAddr = vSchedAddrOverride || (useV2 ? network.contractsV1.vestingSchedulerV2 : network.contractsV1.vestingScheduler);
-    if (!vSchedAddr) throw `no VestingScheduler${useV2 ? "V2" : ""} address provided or found in metadata for network ${network.name}`;
-    console.log(`Using VestingScheduler address: ${vSchedAddr}`);
-    return new ethers.Contract(vSchedAddr, (useV2 ? VestingSchedulerV2Abi : VestingSchedulerAbi), provider);
+    const vSchedAddr = vSchedAddrOverride || getContractAddressForVersion(network, contractVersion);
+    if (!vSchedAddr) throw `no VestingScheduler${contractVersion > 1 ? `V${contractVersion}` : ""} address provided or found in metadata for network ${network.name}`;
+    console.log(`Using VestingScheduler V${contractVersion} address: ${vSchedAddr}`);
+    return new ethers.Contract(vSchedAddr, getAbiForVersion(contractVersion), provider);
 }
 
 function getIndexOf(activeSchedules, superToken, sender, receiver) {
@@ -178,7 +195,7 @@ async function run(customProvider, impersonatedSigner, dataDirOverride) {
 
         const vSched = await initVestingScheduler(network, provider);
 
-        const stateFileName = `${dataDirOverride || dataDir}/vestingschedules${useV2 ? "v2" : ""}_${network.name}.json`;
+        const stateFileName = `${dataDirOverride || dataDir}/vestingschedules-v${contractVersion}_${network.name}.json`;
         console.log(`Using state file: ${stateFileName}`);
         const { startBlock, activeSchedules, removedSchedules } = await common.loadState(stateFileName, network, initStartBlockOverride);
 

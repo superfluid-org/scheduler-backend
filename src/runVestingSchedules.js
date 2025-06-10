@@ -91,11 +91,9 @@ const eventHandlers = {
     },
     VestingScheduleUpdated: (e, activeSchedules) => {
         // assert that the schedule exists
-        const curIndex = getIndexOf(e.superToken, e.sender, e.receiver);
+        const curIndex = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
         if (curIndex == -1) throw `trying to update schedule which doesn't exist: ${e.superToken} ${e.sender} ${e.receiver}`;
         const prevEndDate = activeSchedules[curIndex].endDate;
-        // assertion
-        if (prevEndDate != e.endDate) throw `mismatch of old endDate for ${e.superToken} ${e.sender} ${e.receiver} | persisted ${prevEndDate}, in event ${e.endDate}`;
 
         activeSchedules[curIndex].endDate = e.endDate;
         console.log(`UPDATED: endDate ${e.endDate} for ${e.superToken} ${e.sender} ${e.receiver}`);
@@ -173,13 +171,19 @@ async function processStop(vSched, signer, s) {
 
     if (blockTime > s.endDate) {
         console.warn(`!!! stopping overdue, end time missed for ${s.superToken} ${s.sender} ${s.receiver} by ${blockTime - s.endDate} s !!!`);
-    } else {
-        try {
-            console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver}`);
-            const receipt = await common.executeTx(vSched, signer, "executeEndVesting", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
-            console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
-        } catch(e) {
-            console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
+    }
+    try {
+        console.log(`+++ stopping: ${s.superToken} ${s.sender} ${s.receiver}`);
+        const receipt = await common.executeTx(vSched, signer, "executeEndVesting", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
+        console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
+    } catch(e) {
+        if (!blockTime > s.endDate) {
+            if (blockTime > s.endDate) {
+                // be less verbose if it's not the first time we're trying to stop
+                console.error(`### stopping failed (again) for ${s.superToken} ${s.sender} ${s.receiver}`);
+            } else {
+                console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
+            }
         }
     }
 }

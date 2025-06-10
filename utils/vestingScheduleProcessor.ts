@@ -1,4 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
+import chalk from 'chalk';
 
 const MAX_ITEMS = 1000;
 const END_DATE_VALID_BEFORE = 24 * 60 * 60; // 1 day in seconds
@@ -231,6 +232,13 @@ async function main() {
         const ended = schedules.filter(s => s.status === 'ended');
         const failed = schedules.filter(s => s.status === 'failed');
 
+        // Sort active schedules by time until end (descending)
+        active.sort((a, b) => {
+            const timeUntilEndA = a.schedule.endDate - now;
+            const timeUntilEndB = b.schedule.endDate - now;
+            return timeUntilEndB - timeUntilEndA;
+        });
+
         // Print active schedules (always)
         console.log('\nActive Schedules:');
         console.log('----------------');
@@ -246,7 +254,7 @@ async function main() {
             console.log(`Running for: ${formatDuration(runningTime)}`);
             console.log(`Time until end: ${formatDuration(timeUntilEnd)}`);
             if (s.isInStopWindow) {
-                console.log(`(Can be stopped now)`);
+                console.log(chalk.yellow.bold('(Can be stopped now)'));
             } else {
                 const timeUntilStopWindow = (s.schedule.endDate - END_DATE_VALID_BEFORE) - now;
                 console.log(`(Can be stopped in: ${formatDuration(timeUntilStopWindow)})`);
@@ -255,6 +263,13 @@ async function main() {
         });
 
         if (verbose || printFinished) {
+            // Sort ended schedules by end time (most recent first)
+            ended.sort((a, b) => {
+                const endTimeA = a.schedule.deletedAt || a.schedule.endExecutedAt || 0;
+                const endTimeB = b.schedule.deletedAt || b.schedule.endExecutedAt || 0;
+                return endTimeB - endTimeA;
+            });
+
             // Print ended schedules
             console.log('\nEnded Schedules:');
             console.log('----------------');
@@ -273,6 +288,9 @@ async function main() {
         }
 
         if (verbose) {
+            // Sort not started schedules by start date (soonest first)
+            notStarted.sort((a, b) => a.schedule.startDate - b.schedule.startDate);
+
             // Print not started schedules
             console.log('\nNot Started Schedules:');
             console.log('----------------');
@@ -289,6 +307,9 @@ async function main() {
                 }
                 console.log('----------------');
             });
+
+            // Sort failed schedules by failure time (most recent first)
+            failed.sort((a, b) => (a.schedule.failedAt || 0) - (b.schedule.failedAt || 0));
 
             // Print failed schedules
             console.log('\nFailed Schedules:');

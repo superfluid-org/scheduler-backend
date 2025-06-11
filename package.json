@@ -1,27 +1,26 @@
 {
   "name": "scheduler-backend",
   "version": "1.0.0",
-  "description": "Vesting Schedule Processor",
-  "main": "utils/vestingScheduleProcessor.ts",
+  "description": "",
   "scripts": {
-    "start": "ts-node utils/vestingScheduleProcessor.ts"
+    "test": "START_BLOCK=15472232 hardhat test",
+    "vesting": "node src/runVestingSchedules.js",
+    "vestingV2": "USE_V2=true node src/runVestingSchedules.js",
+    "flow": "node src/runFlowSchedules.js",
+    "wrap": "node src/runWrapSchedules.js"
   },
   "license": "ISC",
   "dependencies": {
-    "@d10r/metadata": "^1.6.0",
-    "axios": "^1.6.7",
+    "@superfluid-finance/metadata": "^1.6.0",
+    "axios": "^1.7.7",
     "chai": "4.3.4",
     "dotenv": "^16.4.5",
-    "ethers": "^6.13.2",
-    "chalk": "^4.1.2"
+    "ethers": "^6.13.2"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "@nomiclabs/hardhat-waffle": "^2.0.6",
-    "hardhat": "^2.22.10",
-    "@types/node": "^20.11.24",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "hardhat": "^2.22.10"
   }
 }

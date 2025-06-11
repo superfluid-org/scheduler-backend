@@ -1,6 +1,6 @@
 const fs = require("fs");
 const { ethers } = require("ethers");
-const sfMeta = require("@d10r/metadata");
+const sfMeta = require("@superfluid-finance/metadata");
 const axios = require('axios');
 
 const ALLOWLIST_URL = process.env.ALLOWLIST_URL || 'https://allowlist.superfluid.dev/api/_allowlist';

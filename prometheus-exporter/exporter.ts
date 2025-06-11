@@ -42,7 +42,7 @@ class VestingScheduleExporter {
             })
             .map(network => ({
                 name: network.name,
-                subgraphUrl: `https://subgraph-endpoints.superfluid.dev/${network.name}/vesting-scheduler`
+                subgraphUrl: `https://subgraph-endpoints.superfluid.dev/${network.name}/vesting-scheduler?app=scheduler-exporter-s73gi3`
             }));
 
         // Log network configurations

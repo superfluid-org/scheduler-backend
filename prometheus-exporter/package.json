@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "exporter.ts",
   "scripts": {
-    "start": "ts-node exporter.ts"
+    "start": "ts-node exporter.ts",
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn exporter.ts"
   },
   "license": "ISC",
   "dependencies": {

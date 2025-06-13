@@ -2,6 +2,7 @@ import { VestingScheduleProcessor } from './vestingScheduleProcessor';
 import express from 'express';
 import { Registry, Gauge } from 'prom-client';
 import sfMeta from '@superfluid-finance/metadata';
+import axios from 'axios';
 
 const END_DATE_VALID_BEFORE = 24 * 60 * 60; // 1 day in seconds
 const OVERDUE_THRESHOLD = 2 * 60 * 60; // 2 hours in seconds
@@ -102,7 +103,11 @@ class VestingScheduleExporter {
                 }
             }
         } catch (error) {
-            console.error('Error updating metrics:', error);
+            if (axios.isAxiosError(error)) {
+                console.error(`Error updating metrics: ${error.response?.status} ${error.response?.statusText}`);
+            } else {
+                console.error('Error updating metrics:', error);
+            }
         }
     }
 

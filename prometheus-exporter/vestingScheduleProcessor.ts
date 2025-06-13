@@ -186,17 +186,6 @@ class VestingScheduleProcessor {
                     failedAt
                     cliffAndFlowExecutedAt
                     endExecutedAt
-                    events(skip: 0, first: 100, orderBy: id, orderDirection: asc) {
-                        id
-                        blockNumber
-                        logIndex
-                        order
-                        name
-                        addresses
-                        timestamp
-                        transactionHash
-                        gasPrice
-                    }
                     claimValidityDate
                     claimedAt
                     remainderAmount
@@ -333,7 +322,12 @@ async function main() {
         console.log(`Failed: ${failed.length}`);
 
     } catch (error) {
-        console.error('Error processing schedules:', error);
+        if (axios.isAxiosError(error)) {
+            console.error(`Error processing schedules}: ${error.response?.status} ${error.response?.statusText}`);
+        } else {
+            console.error('Error processing schedules:', error);
+        }
+
         process.exit(1);
     }
 }

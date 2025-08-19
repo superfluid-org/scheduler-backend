@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
 import chalk from 'chalk';
+import { ProcessorBase, formatDuration } from './processorBase';
 
-const MAX_ITEMS = 1000;
 const END_DATE_VALID_BEFORE = 24 * 60 * 60; // 1 day in seconds
 
 interface VestingScheduleEvent {
@@ -51,66 +51,9 @@ interface ProcessedSchedule {
     isClaimed: boolean;
 }
 
-/**
- * Formats a duration in seconds into a human-readable string
- */
-function formatDuration(seconds: number): string {
-    if (seconds < 0) {
-        return `${formatDuration(-seconds)} ago`;
-    }
-
-    const days = Math.floor(seconds / (24 * 60 * 60));
-    const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
-    const minutes = Math.floor((seconds % (60 * 60)) / 60);
-
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-
-    return parts.join(' ') || 'less than a minute';
-}
-
-class VestingScheduleProcessor {
-    private readonly subgraphUrl: string;
-
-    constructor(subgraphUrl: string) {
-        this.subgraphUrl = subgraphUrl;
-    }
-
-    /**
-     * Queries all pages of a paginated GraphQL response.
-     */
-    private async _queryAllPages(queryFn: (lastId: string) => string, toItems: (res: AxiosResponse<any>) => any[], itemFn: (item: any) => any): Promise<any[]> {
-        let lastId = "";
-        const items: any[] = [];
-
-        while (true) {
-            const res = await this._graphql(queryFn(lastId));
-
-            if (res.status !== 200 || res.data.errors) {
-                console.error(`bad response ${res.status}`);
-                throw new Error(`GraphQL query failed: ${res.data.errors}`);
-            } else if (res.data === "") {
-                console.error("empty response data");
-                throw new Error("Empty response data from GraphQL query");
-            } else {
-                const newItems = toItems(res);
-                items.push(...newItems.map(itemFn));
-
-                if (newItems.length < MAX_ITEMS) {
-                    break;
-                } else {
-                    lastId = newItems[newItems.length - 1].id;
-                }
-            }
-        }
-
-        return items;
-    }
-
-    private async _graphql(query: string): Promise<AxiosResponse> {
-        return axios.post(this.subgraphUrl, { query });
+class VestingScheduleProcessor extends ProcessorBase {
+    constructor(subgraphUrl: string, networkName: string) {
+        super(subgraphUrl, networkName);
     }
 
     /**
@@ -157,11 +100,11 @@ class VestingScheduleProcessor {
     /**
      * Processes all vesting schedules and returns them with their status
      */
-    public async processSchedules(): Promise<ProcessedSchedule[]> {
+    public async getVestingSchedules(): Promise<ProcessedSchedule[]> {
         const queryFn = (lastId: string) => `
             {
                 vestingSchedules(
-                    first: ${MAX_ITEMS},
+                    first: ${this.MAX_ITEMS},
                     where: { id_gt: "${lastId}" },
                     orderBy: id,
                     orderDirection: asc
@@ -200,6 +143,7 @@ class VestingScheduleProcessor {
     }
 }
 
+// used only for interactive debugging
 async function main() {
     const subgraphUrl = process.env.SUBGRAPH_URL || process.argv[2];
     if (!subgraphUrl) {
@@ -211,8 +155,8 @@ async function main() {
     const verbose = process.env.VERBOSE === 'true';
 
     try {
-        const processor = new VestingScheduleProcessor(subgraphUrl);
-        const schedules = await processor.processSchedules();
+        const processor = new VestingScheduleProcessor(subgraphUrl, 'unknown');
+        const schedules = await processor.getVestingSchedules();
         const now = Math.floor(Date.now() / 1000);
 
         // Categorize schedules

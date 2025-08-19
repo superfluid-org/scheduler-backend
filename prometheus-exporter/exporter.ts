@@ -1,4 +1,6 @@
 import { VestingScheduleProcessor } from './vestingScheduleProcessor';
+import { AutowrapProcessor } from './autowrapProcessor';
+import { ProcessorBase } from './processorBase';
 import express from 'express';
 import { Registry, Gauge } from 'prom-client';
 import sfMeta from '@superfluid-finance/metadata';
@@ -9,17 +11,18 @@ const OVERDUE_THRESHOLD = 2 * 60 * 60; // 2 hours in seconds
 const UPDATE_INTERVAL = 20 * 60 * 1000; // 20 minutes in milliseconds
 const TWO_DAYS = 2 * 24 * 60 * 60; // 2 days in seconds
 
-class VestingScheduleExporter {
-    private readonly processors: Map<string, VestingScheduleProcessor>;
+class Exporter {
+    private readonly processors: ProcessorBase[];
     private readonly registry: Registry;
     private readonly vestingEndOverdueGauge: Gauge;
+    private readonly autowrapOverdueGauge: Gauge;
     private updateTimer: NodeJS.Timeout | null = null;
 
     constructor() {
-        this.processors = new Map();
+        this.processors = [];
         this.registry = new Registry();
         
-        // Create the gauge metric with network label
+        // Create the vesting gauge metric with network label
         this.vestingEndOverdueGauge = new Gauge({
             name: 'vesting_end_overdue',
             help: 'Number of active vesting schedules that have been in the stop window for at least 2 hours',
@@ -27,38 +30,68 @@ class VestingScheduleExporter {
             registers: [this.registry]
         });
 
-        // Initialize networks
-        this.initializeNetworks();
+        // Create the autowrap gauge metric with network label
+        this.autowrapOverdueGauge = new Gauge({
+            name: 'autowrap_overdue',
+            help: 'Number of autowrap schedules that are overdue for execution',
+            labelNames: ['network'],
+            registers: [this.registry]
+        });
+
+        this.initializeProcessors();
     }
 
-    private initializeNetworks() {
-        const supportedNetworks = sfMeta.networks
-            .filter(network => {
-                if (network.isTestnet) return false;
-                
-                const contracts = network.contractsV1 || {};
-                return contracts.vestingScheduler || 
-                       contracts.vestingSchedulerV2 || 
-                       contracts.vestingSchedulerV3;
-            })
-            .map(network => ({
-                name: network.name,
-                subgraphUrl: `https://subgraph-endpoints.superfluid.dev/${network.name}/vesting-scheduler?app=scheduler-exporter-s73gi3`
-            }));
-
-        // Log network configurations
+    // create a processor for all schedulers on all networks
+    private initializeProcessors() {
+        const networks = sfMeta.networks.filter(network => !network.isTestnet);
+        
         console.log('\nInitializing networks:');
-        supportedNetworks.forEach(network => {
-            console.log(`- ${network.name}: ${network.subgraphUrl}`);
-            this.processors.set(network.name, new VestingScheduleProcessor(network.subgraphUrl));
+        
+        networks.forEach(network => {
+            const contracts = network.contractsV1 || {};
+            const hasVestingScheduler = contracts.vestingScheduler || 
+                                       contracts.vestingSchedulerV2 || 
+                                       contracts.vestingSchedulerV3;
+            const hasAutowrapManager = contracts.autowrap?.manager;
+            
+            if (hasVestingScheduler) {
+                const vestingSubgraphUrl = network.subgraphVesting?.hostedEndpoint || 
+                    `https://subgraph-endpoints.superfluid.dev/${network.name}/vesting-scheduler?app=scheduler-exporter-s73gi3`;
+                console.log(`- ${network.name}: Adding VestingScheduleProcessor - ${vestingSubgraphUrl}`);
+                this.processors.push(new VestingScheduleProcessor(vestingSubgraphUrl, network.name));
+            }
+            
+            if (hasAutowrapManager) {
+                const autowrapSubgraphUrl = network.subgraphAutoWrap?.hostedEndpoint || 
+                    `https://subgraph-endpoints.superfluid.dev/${network.name}/auto-wrap?app=scheduler-exporter-s73gi3`;
+                const rpcUrl = `https://${network.name}.rpc.x.superfluid.dev?app=scheduler-exporter-s73gi3`;
+                console.log(`- ${network.name}: Adding AutowrapProcessor - ${autowrapSubgraphUrl}`);
+                this.processors.push(new AutowrapProcessor(autowrapSubgraphUrl, network.name, rpcUrl));
+            }
+            
+            if (!hasVestingScheduler && !hasAutowrapManager) {
+                console.log(`- ${network.name}: No supported contracts found, skipping`);
+            }
         });
-        console.log(`Total networks: ${supportedNetworks.length}\n`);
+        
+        console.log(`Total processors initialized: ${this.processors.length}\n`);
     }
 
     private async updateMetrics() {
+        // get the processors of each type
+        const vestingProcessors = this.processors.filter(processor => processor instanceof VestingScheduleProcessor) as VestingScheduleProcessor[];
+        const autowrapProcessors = this.processors.filter(processor => processor instanceof AutowrapProcessor) as AutowrapProcessor[];
+        
+        await Promise.all([
+            this.updateVestingMetrics(vestingProcessors),
+            this.updateAutowrapMetrics(autowrapProcessors)
+        ]);
+    }
+
+    private async updateVestingMetrics(vestingProcessors: VestingScheduleProcessor[]) {
         try {
-            for (const [networkName, processor] of this.processors) {
-                const schedules = await processor.processSchedules();
+            for (const processor of vestingProcessors) {
+                const schedules = await processor.getVestingSchedules();
                 const now = Math.floor(Date.now() / 1000);
                 
                 // Count schedules that are overdue
@@ -79,14 +112,14 @@ class VestingScheduleExporter {
                     .sort((a, b) => b.schedule.endDate - a.schedule.endDate);
 
                 // Update the gauge with network label
-                this.vestingEndOverdueGauge.set({ network: networkName }, overdueCount);
+                this.vestingEndOverdueGauge.set({ network: processor.networkName }, overdueCount);
                 
                 // Log metrics update
-                console.log(`[${new Date().toISOString()}] ${networkName} - Updated metrics. Overdue schedules: ${overdueCount}`);
+                console.log(`[${new Date().toISOString()}] ${processor.networkName} - Updated vesting metrics. Overdue schedules: ${overdueCount}`);
                 
                 // Log schedules ending soon
                 if (endingSoon.length > 0) {
-                    console.log(`\n${networkName} - Schedules ending in next 2 days:`);
+                    console.log(`\n${processor.networkName} - Vesting Schedules ending in next 2 days:`);
                     console.log('----------------');
                     endingSoon.forEach(schedule => {
                         const timeUntilEnd = schedule.schedule.endDate - now;
@@ -104,9 +137,34 @@ class VestingScheduleExporter {
             }
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                console.error(`Error updating metrics: ${error.response?.status} ${error.response?.statusText}`);
+                console.error(`Error updating vesting metrics: ${error.response?.status} ${error.response?.statusText}`);
             } else {
-                console.error('Error updating metrics:', error);
+                console.error('Error updating vesting metrics:', error);
+            }
+        }
+    }
+
+    private async updateAutowrapMetrics(autowrapProcessors: AutowrapProcessor[]) {
+        try {
+            for (const processor of autowrapProcessors) {
+                const schedules = await processor.getAutowrapSchedules();
+                const now = Math.floor(Date.now() / 1000);
+                
+                // Count schedules that are overdue
+                const overdueCount = schedules.filter(schedule => {
+                    return schedule.due_since > 0 && (now - schedule.due_since) > OVERDUE_THRESHOLD;
+                }).length;
+
+                // Update the gauge with network label
+                this.autowrapOverdueGauge.set({ network: processor.networkName }, overdueCount);
+                
+                console.log(`[${new Date().toISOString()}] ${processor.networkName} - Updated autowrap metrics. Overdue schedules: ${overdueCount}`);
+            }
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error(`Error updating autowrap metrics: ${error.response?.status} ${error.response?.statusText}`);
+            } else {
+                console.error('Error updating autowrap metrics:', error);
             }
         }
     }
@@ -132,7 +190,7 @@ class VestingScheduleExporter {
 
         // Start the server
         app.listen(port, () => {
-            console.log(`Vesting schedule exporter listening on port ${port}`);
+            console.log(`Exporter listening on port ${port}`);
         });
 
         // Initial metrics update
@@ -153,7 +211,7 @@ class VestingScheduleExporter {
 // Only run if this file is being executed directly
 if (require.main === module) {
     const port = parseInt(process.env.PORT || '9090', 10);
-    const exporter = new VestingScheduleExporter();
+    const exporter = new Exporter();
 
     // Handle graceful shutdown
     process.on('SIGTERM', () => {
@@ -174,4 +232,4 @@ if (require.main === module) {
     });
 }
 
-export { VestingScheduleExporter }; 
+export { Exporter }; 

@@ -1,6 +1,6 @@
 {
   "name": "scheduler-prometheus-exporter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "exporter.ts",
   "scripts": {
     "start": "ts-node exporter.ts",
@@ -9,11 +9,13 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@sfpro/sdk": "^0.1.0",
     "@superfluid-finance/metadata": "^1.6.0",
     "axios": "^1.9.0",
     "chalk": "^4.1.2",
     "express": "^4.18.3",
-    "prom-client": "^15.1.0"
+    "prom-client": "^15.1.0",
+    "viem": "^2.33.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

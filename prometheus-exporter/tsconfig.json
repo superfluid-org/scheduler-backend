@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
-        "target": "ES2020",
-        "module": "CommonJS",
+        "target": "ES2022",
+        "module": "NodeNext",
         "lib": ["ES2020"],
         "strict": true,
         "esModuleInterop": true,
@@ -9,7 +9,7 @@
         "forceConsistentCasingInFileNames": true,
         "outDir": "./dist",
         "rootDir": ".",
-        "moduleResolution": "node"
+        "moduleResolution": "NodeNext"
     },
     "include": [
         "**/*"

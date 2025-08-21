@@ -28,7 +28,12 @@ class ProcessorBase {
     }
 
     protected async _graphql(query: string): Promise<AxiosResponse> {
-        return axios.post(this.subgraphUrl, { query });
+        const response = await axios.post(this.subgraphUrl, { query });
+        if (response.data.errors) {
+            console.error('GraphQL errors:', JSON.stringify(response.data.errors, null, 2));
+            throw new Error('GraphQL query returned errors');
+        }
+        return response;
     }
 
     protected async _queryAllPages(queryFn: (lastId: string) => string, toItems: (res: AxiosResponse<any>) => any[], itemFn: (item: any) => any): Promise<any[]> {
@@ -38,11 +43,14 @@ class ProcessorBase {
         while (true) {
             const res = await this._graphql(queryFn(lastId));
 
-            if (res.status !== 200 || res.data.errors) {
-                console.error(`bad response ${res.status}`);
-                throw new Error(`GraphQL query failed: ${res.data.errors}`);
-            } else if (res.data === "") {
-                console.error("empty response data");
+            if (res.status !== 200) {
+                console.error(`Bad HTTP status: ${res.status}`);
+                throw new Error(`HTTP request failed with status ${res.status}`);
+            } else if (res.data.errors) {
+                console.error('GraphQL errors:', JSON.stringify(res.data.errors, null, 2));
+                throw new Error('GraphQL query returned errors');
+            } else if (!res.data.data) {
+                console.error("Empty response data");
                 throw new Error("Empty response data from GraphQL query");
             } else {
                 const newItems = toItems(res);

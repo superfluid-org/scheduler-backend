@@ -199,8 +199,7 @@ async function run(customProvider, impersonatedSigner, dataDirOverride) {
 
         const allowlist = await common.loadAllowlist();
 
-        const toBlock = await processFlowSchedules(fSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS);
-        await common.saveState(stateFileName, toBlock, activeSchedules, removedSchedules);
+        await processFlowSchedules(fSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS);
     } catch (error) {
         console.error("Error in run function:", error);
         throw error;

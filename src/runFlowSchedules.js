@@ -114,7 +114,7 @@ const eventHandlers = {
 
 async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS) {
     const toBeStarted = activeSchedules
-        .filter(s => !s.started && !s.failed && s.startDate + executionDelayS <= blockTime)
+        .filter(s => !s.started && !s.failed && s.startDate !== 0 && s.startDate + executionDelayS <= blockTime)
         /* If a flow failed to start, e.g. because of a lack of funds or permission, or automation failure,
         it may eventually be out of the time window where starting is possible (according to `maxStartDelay` which is defined per schedule).
         In that case we flag the schedule as failed in order to avoid eternal retrying. */

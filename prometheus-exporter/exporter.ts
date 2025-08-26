@@ -94,7 +94,7 @@ class Exporter {
     private async init() {
         const sfMetaModule = await import('@superfluid-finance/metadata');
         const sfMeta = sfMetaModule.default;
-        const networks = sfMeta.networks.filter(network => !network.isTestnet);
+        const networks = sfMeta.networks;
         
         console.log('\nInitializing networks:');
         

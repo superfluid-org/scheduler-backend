@@ -1,12 +1,13 @@
 {
   "name": "scheduler-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "executors for Superfluid schedulers",
   "scripts": {
     "test": "hardhat test",
     "test:wrap": "hardhat test test/wrapSchedules.spec.ts",
-    "vesting": "node src/runVestingSchedules.js",
-    "vestingV2": "USE_V2=true node src/runVestingSchedules.js",
+    "vestingV1": "CONTRACT_VERSION=1 node src/runVestingSchedules.js",
+    "vestingV2": "CONTRACT_VERSION=2 node src/runVestingSchedules.js",
+    "vestingV3": "CONTRACT_VERSION=3 node src/runVestingSchedules.js",
     "flow": "node src/runFlowSchedules.js",
     "wrap": "node src/runWrapSchedules.js"
   },

@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@sfpro/sdk": "^0.1.0",
-    "@superfluid-finance/metadata": "^1.6.0",
+    "@superfluid-finance/metadata": "^1.6.1",
     "axios": "^1.9.0",
     "chalk": "^4.1.2",
     "express": "^4.18.3",

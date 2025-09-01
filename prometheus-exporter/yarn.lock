@@ -88,10 +88,10 @@
   resolved "https://registry.yarnpkg.com/@sfpro/sdk/-/sdk-0.1.0.tgz#d123483548fece08a86a8bf79d3b55bf9d92781f"
   integrity sha512-APpVxp429J/hteHC3+CCARsUJFTRNVnX3q5vDTEyaQLs780HXR6hCAGgPQsoNSF7ekeFHASM9ws3g2tiBwUBuQ==
 
-"@superfluid-finance/metadata@^1.6.0":
-  version "1.6.0"
-  resolved "https://registry.yarnpkg.com/@superfluid-finance/metadata/-/metadata-1.6.0.tgz#b0569c4fcddaf608e6ff075d7bee6d6aa007ee81"
-  integrity sha512-GB/VNaH9JDxX4BK1N+Yb2LUOt1I5JkZ1mTCaqeyM+MLG+J95ixW5hPm0MVY0KFTDvrB5vBMiuyv8vEeQlqLJkw==
+"@superfluid-finance/metadata@^1.6.1":
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/@superfluid-finance/metadata/-/metadata-1.6.1.tgz#aefde563fa59f6aaa2404644d443166515a86ef7"
+  integrity sha512-vUJj9p9wuZ55E1zVBlGbJBztHLEQOp4m4ON/ImQnDdrRotOrOVAVJa59i4PmFuMdOyAPEMwVGUrGshaLtmPqKg==
 
 "@tsconfig/node10@^1.0.7":
   version "1.0.11"

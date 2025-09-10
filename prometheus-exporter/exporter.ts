@@ -155,9 +155,9 @@ class Exporter {
                 const schedules = await processor.getVestingSchedules();
                 const now = Math.floor(Date.now() / 1000);
                 
-                // Count schedules that are overdue
+                // Count schedules that are overdue for end execution
                 const endOverdueCount = schedules.filter(schedule => {
-                    if (schedule.status !== 'active') return false;
+                    if (!schedule.isInStopWindow) return false;
                     
                     const timeInStopWindow = now - (schedule.schedule.endDate - END_DATE_VALID_BEFORE);
                     return timeInStopWindow >= OVERDUE_THRESHOLD;
@@ -175,12 +175,13 @@ class Exporter {
                 // Update the gauge with network label
                 this.vestingEndOverdueGauge.set({ network: processor.networkName }, endOverdueCount);
                 
+                // Count auto-start schedules that are overdue for start execution
                 const startOverdueCount = schedules.filter(schedule => {
-                    if (schedule.status !== 'not_started') return false;
-                    if (schedule.schedule.claimValidityDate > 0) return false;
+                    if (!schedule.isInStartWindow) return false;
+                    if (schedule.isClaimable) return false; // Only auto-start schedules
                     
-                    const timeSinceStartPossible = now - schedule.schedule.cliffAndFlowDate;
-                    return timeSinceStartPossible >= OVERDUE_THRESHOLD && now < schedule.schedule.cliffAndFlowExpirationAt;
+                    const timeInStartWindow = now - schedule.schedule.cliffAndFlowDate;
+                    return timeInStartWindow >= OVERDUE_THRESHOLD;
                 }).length;
 
                 this.vestingStartOverdueGauge.set({ network: processor.networkName }, startOverdueCount);

@@ -150,7 +150,21 @@ class VestingScheduleProcessor extends ProcessorBase {
         `;
 
         const toItems = (res: AxiosResponse) => res.data.data.vestingSchedules;
-        const itemFn = (schedule: VestingSchedule) => this.getScheduleStatus(schedule);
+        const itemFn = (schedule: any) => this.getScheduleStatus({
+            ...schedule,
+            startDate: Number(schedule.startDate),
+            endDate: Number(schedule.endDate),
+            cliffDate: Number(schedule.cliffDate),
+            cliffAndFlowDate: Number(schedule.cliffAndFlowDate),
+            cliffAndFlowExpirationAt: Number(schedule.cliffAndFlowExpirationAt),
+            endDateValidAt: Number(schedule.endDateValidAt),
+            deletedAt: schedule.deletedAt ? Number(schedule.deletedAt) : null,
+            failedAt: schedule.failedAt ? Number(schedule.failedAt) : null,
+            cliffAndFlowExecutedAt: schedule.cliffAndFlowExecutedAt ? Number(schedule.cliffAndFlowExecutedAt) : null,
+            endExecutedAt: schedule.endExecutedAt ? Number(schedule.endExecutedAt) : null,
+            claimValidityDate: Number(schedule.claimValidityDate),
+            claimedAt: schedule.claimedAt ? Number(schedule.claimedAt) : null
+        });
 
         return this._queryAllPages(queryFn, toItems, itemFn);
     }
@@ -187,6 +201,89 @@ async function main() {
         const schedulesInStartWindow = notStarted.filter(s => s.isInStartWindow);
         const schedulesInStopWindow = started.filter(s => s.isInStopWindow);
 
+        // Helper function to print not started schedule details
+        const printNotStartedSchedule = (s: ProcessedSchedule, showAll: boolean = false) => {
+            console.log(`ID: ${s.schedule.id}`);
+            console.log(`SuperToken: ${s.schedule.superToken}`);
+            console.log(`Sender: ${s.schedule.sender}`);
+            console.log(`Receiver: ${s.schedule.receiver}`);
+            console.log(`Start date: ${new Date(s.schedule.startDate * 1000).toISOString()}`);
+            
+            if (s.isClaimable) {
+                console.log(`Claimable until: ${new Date(Number(s.schedule.claimValidityDate) * 1000).toISOString()}`);
+                console.log(`Status: ${s.isClaimed ? 'Claimed' : 'Not claimed'}`);
+            } else {
+                if (s.isInStartWindow) {
+                    const claimValidityDate = Number(s.schedule.claimValidityDate);
+                    const cliffAndFlowDate = Number(s.schedule.cliffAndFlowDate);
+                    const timeRemainingInStartWindow = claimValidityDate > 0 
+                        ? claimValidityDate - now
+                        : (cliffAndFlowDate + START_DATE_VALID_AFTER) - now;
+                    const timeSinceInStartWindow = now - cliffAndFlowDate;
+                    console.log(chalk.green.bold(`(Can be started now - in window for ${formatDuration(timeSinceInStartWindow)}, remaining ${formatDuration(timeRemainingInStartWindow)})`));
+                } else if (showAll) {
+                    const timeUntilStartWindow = Number(s.schedule.cliffAndFlowDate) - now;
+                    console.log(`(Can be started in: ${formatDuration(timeUntilStartWindow)})`);
+                }
+            }
+            console.log('----------------');
+        };
+
+        // Helper function to print started schedule details
+        const printStartedSchedule = (s: ProcessedSchedule, showAll: boolean = false, counter?: number) => {
+            const runningTime = now - (s.schedule.cliffAndFlowExecutedAt || 0);
+            const timeUntilEnd = s.schedule.endDate - now;
+            
+            if (counter !== undefined) {
+                console.log(`#: ${counter}`);
+            }
+            console.log(`ID: ${s.schedule.id}`);
+            console.log(`SuperToken: ${s.schedule.superToken}`);
+            console.log(`Sender: ${s.schedule.sender}`);
+            console.log(`Receiver: ${s.schedule.receiver}`);
+            console.log(`Flow Rate: ${s.schedule.flowRate}`);
+            console.log(`Running for: ${formatDuration(runningTime)}`);
+            console.log(`Time until end: ${formatDuration(timeUntilEnd)}`);
+            
+            if (s.isInStopWindow) {
+                if (showAll) {
+                    const timeRemainingInStopWindow = s.schedule.endDate - now;
+                    const timeSinceInStopWindow = now - (s.schedule.endDate - END_DATE_VALID_BEFORE);
+                    console.log(chalk.yellow.bold(`(Can be stopped now - in window for ${formatDuration(timeSinceInStopWindow)}, remaining ${formatDuration(timeRemainingInStopWindow)})`));
+                } else {
+                    console.log(chalk.yellow.bold('(Can be stopped now)'));
+                }
+            } else if (showAll) {
+                const timeUntilStopWindow = (s.schedule.endDate - END_DATE_VALID_BEFORE) - now;
+                console.log(`(Can be stopped in: ${formatDuration(timeUntilStopWindow)})`);
+            }
+            console.log('----------------');
+        };
+
+        // Helper function to print failed schedule details
+        const printFailedSchedule = (s: ProcessedSchedule) => {
+            console.log(`ID: ${s.schedule.id}`);
+            console.log(`SuperToken: ${s.schedule.superToken}`);
+            console.log(`Sender: ${s.schedule.sender}`);
+            console.log(`Receiver: ${s.schedule.receiver}`);
+            console.log(`Failed at: ${new Date(s.schedule.failedAt! * 1000).toISOString()}`);
+            console.log('----------------');
+        };
+
+        // Helper function to print ended schedule details
+        const printEndedSchedule = (s: ProcessedSchedule) => {
+            console.log(`ID: ${s.schedule.id}`);
+            console.log(`SuperToken: ${s.schedule.superToken}`);
+            console.log(`Sender: ${s.schedule.sender}`);
+            console.log(`Receiver: ${s.schedule.receiver}`);
+            if (s.schedule.deletedAt) {
+                console.log(`Deleted at: ${new Date(s.schedule.deletedAt * 1000).toISOString()}`);
+            } else if (s.schedule.endExecutedAt) {
+                console.log(`Ended at: ${new Date(s.schedule.endExecutedAt * 1000).toISOString()}`);
+            }
+            console.log('----------------');
+        };
+
         if (verbose) {
             // Verbose mode: show all schedules
             console.log(`Found ${ended.length} ended schedules`);
@@ -194,152 +291,49 @@ async function main() {
             console.log(`Found ${notStarted.length} not started schedules`);
             console.log(`Found ${started.length} started schedules`);
 
-            // Sort not started schedules by start date (soonest first)
+            // Sort and print not started schedules
             notStarted.sort((a, b) => a.schedule.startDate - b.schedule.startDate);
-
-            // Print not started schedules
             console.log('\nNot Started Schedules:');
             console.log('----------------');
-            notStarted.forEach(s => {
-                console.log(`ID: ${s.schedule.id}`);
-                console.log(`SuperToken: ${s.schedule.superToken}`);
-                console.log(`Sender: ${s.schedule.sender}`);
-                console.log(`Receiver: ${s.schedule.receiver}`);
-                console.log(`Start date: ${new Date(s.schedule.startDate * 1000).toISOString()}`);
-                if (s.isClaimable) {
-                    console.log(`Claimable until: ${new Date(Number(s.schedule.claimValidityDate) * 1000).toISOString()}`);
-                    console.log(`Status: ${s.isClaimed ? 'Claimed' : 'Not claimed'}`);
-                } else {
-                    if (s.isInStartWindow) {
-                        console.log(chalk.green.bold('(Can be started now)'));
-                    } else {
-                        const timeUntilStartWindow = Number(s.schedule.cliffAndFlowDate) - now;
-                        console.log(`(Can be started in: ${formatDuration(timeUntilStartWindow)})`);
-                    }
-                }
-                console.log('----------------');
-            });
+            notStarted.forEach(s => printNotStartedSchedule(s, true));
 
-            // Sort failed schedules by failure time (most recent first)
+            // Sort and print failed schedules
             failed.sort((a, b) => (a.schedule.failedAt || 0) - (b.schedule.failedAt || 0));
-
-            // Print failed schedules
             console.log('\nFailed Schedules:');
             console.log('----------------');
-            failed.forEach(s => {
-                console.log(`ID: ${s.schedule.id}`);
-                console.log(`SuperToken: ${s.schedule.superToken}`);
-                console.log(`Sender: ${s.schedule.sender}`);
-                console.log(`Receiver: ${s.schedule.receiver}`);
-                console.log(`Failed at: ${new Date(s.schedule.failedAt! * 1000).toISOString()}`);
-                console.log('----------------');
-            });
+            failed.forEach(s => printFailedSchedule(s));
 
-            // Sort active schedules by time until end (descending)
+            // Sort and print started schedules
             started.sort((a, b) => {
                 const timeUntilEndA = a.schedule.endDate - now;
                 const timeUntilEndB = b.schedule.endDate - now;
                 return timeUntilEndB - timeUntilEndA;
             });
-
-            // Print started schedules
             console.log('\nStarted Schedules:');
             console.log('----------------');
-            let activeCounter = 0;
-            started.forEach(s => {
-                const runningTime = now - (s.schedule.cliffAndFlowExecutedAt || 0);
-                const timeUntilEnd = s.schedule.endDate - now;
-                
-                console.log(`#: ${activeCounter}`);
-                console.log(`ID: ${s.schedule.id}`);
-                console.log(`SuperToken: ${s.schedule.superToken}`);
-                console.log(`Sender: ${s.schedule.sender}`);
-                console.log(`Receiver: ${s.schedule.receiver}`);
-                console.log(`Flow Rate: ${s.schedule.flowRate}`);
-                console.log(`Running for: ${formatDuration(runningTime)}`);
-                console.log(`Time until end: ${formatDuration(timeUntilEnd)}`);
-                if (s.isInStopWindow) {
-                    console.log(chalk.yellow.bold('(Can be stopped now)'));
-                } else {
-                    const timeUntilStopWindow = (s.schedule.endDate - END_DATE_VALID_BEFORE) - now;
-                    console.log(`(Can be stopped in: ${formatDuration(timeUntilStopWindow)})`);
-                }
-                console.log('----------------');
-                activeCounter++;
-            });
+            started.forEach((s, index) => printStartedSchedule(s, true, index));
 
             if (printFinished) {
-                // Sort ended schedules by end time (most recent first)
+                // Sort and print ended schedules
                 ended.sort((a, b) => {
                     const endTimeA = a.schedule.deletedAt || a.schedule.endExecutedAt || 0;
                     const endTimeB = b.schedule.deletedAt || b.schedule.endExecutedAt || 0;
                     return endTimeB - endTimeA;
                 });
-
-                // Print ended schedules
                 console.log('\nEnded Schedules:');
                 console.log('----------------');
-                ended.forEach(s => {
-                    console.log(`ID: ${s.schedule.id}`);
-                    console.log(`SuperToken: ${s.schedule.superToken}`);
-                    console.log(`Sender: ${s.schedule.sender}`);
-                    console.log(`Receiver: ${s.schedule.receiver}`);
-                    if (s.schedule.deletedAt) {
-                        console.log(`Deleted at: ${new Date(s.schedule.deletedAt * 1000).toISOString()}`);
-                    } else if (s.schedule.endExecutedAt) {
-                        console.log(`Ended at: ${new Date(s.schedule.endExecutedAt * 1000).toISOString()}`);
-                    }
-                    console.log('----------------');
-                });
+                ended.forEach(s => printEndedSchedule(s));
             }
 
         } else {
             // Non-verbose mode: only show schedules in start or stop windows
-
             console.log(`\nSchedules in Start Window: ${schedulesInStartWindow.length}`);
             console.log('----------------');
-            schedulesInStartWindow.forEach(s => {
-                const claimValidityDate = Number(s.schedule.claimValidityDate);
-                const cliffAndFlowDate = Number(s.schedule.cliffAndFlowDate);
-                
-                const timeRemainingInStartWindow = claimValidityDate > 0 
-                    ? claimValidityDate - now
-                    : (cliffAndFlowDate + START_DATE_VALID_AFTER) - now;
-                
-                console.log(`ID: ${s.schedule.id}`);
-                console.log(`SuperToken: ${s.schedule.superToken}`);
-                console.log(`Sender: ${s.schedule.sender}`);
-                console.log(`Receiver: ${s.schedule.receiver}`);
-                console.log(`Start date: ${new Date(s.schedule.startDate * 1000).toISOString()}`);
-                if (s.isClaimable) {
-                    console.log(`Claimable until: ${new Date(Number(s.schedule.claimValidityDate) * 1000).toISOString()}`);
-                    console.log(`Status: ${s.isClaimed ? 'Claimed' : 'Not claimed'}`);
-                } else {
-                    const timeSinceInStartWindow = now - cliffAndFlowDate;
-                    console.log(chalk.green.bold(`(Can be started now - in window for ${formatDuration(timeSinceInStartWindow)}, remaining ${formatDuration(timeRemainingInStartWindow)})`));
-                }
-                console.log('----------------');
-            });
+            schedulesInStartWindow.forEach(s => printNotStartedSchedule(s, false));
 
             console.log(`\nSchedules in Stop Window: ${schedulesInStopWindow.length}`);
             console.log('----------------');
-            schedulesInStopWindow.forEach(s => {
-                const runningTime = now - (s.schedule.cliffAndFlowExecutedAt || 0);
-                const timeUntilEnd = s.schedule.endDate - now;
-                const timeRemainingInStopWindow = s.schedule.endDate - now; // Time until end date
-                
-                console.log(`ID: ${s.schedule.id}`);
-                console.log(`SuperToken: ${s.schedule.superToken}`);
-                console.log(`Sender: ${s.schedule.sender}`);
-                console.log(`Receiver: ${s.schedule.receiver}`);
-                console.log(`Flow Rate: ${s.schedule.flowRate}`);
-                console.log(`Running for: ${formatDuration(runningTime)}`);
-                console.log(`Time until end: ${formatDuration(timeUntilEnd)}`);
-                const timeSinceInStopWindow = now - (s.schedule.endDate - END_DATE_VALID_BEFORE);
-                console.log(chalk.yellow.bold(`(Can be stopped now - in window for ${formatDuration(timeSinceInStopWindow)}, remaining ${formatDuration(timeRemainingInStopWindow)})`));
-                console.log('----------------');
-            });
-
+            schedulesInStopWindow.forEach(s => printStartedSchedule(s, false));
         }
 
         // Print summary (same for both verbose and non-verbose modes)

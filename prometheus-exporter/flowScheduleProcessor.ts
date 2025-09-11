@@ -1,10 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
 import { ProcessorBase } from './processorBase';
-import { createPublicClient, http } from 'viem';
 import chalk from 'chalk';
 import { formatDuration } from './processorBase';
-
-const OVERDUE_THRESHOLD = 2 * 60 * 60; // 2 hours
 
 interface CreateTask {
     id: string;
@@ -32,6 +29,18 @@ interface DeleteTask {
     superToken: string;
     sender: string;
     receiver: string;
+}
+
+interface ProcessedCreateTask {
+    task: CreateTask;
+    status: 'pending' | 'executed' | 'expired' | 'cancelled';
+    isInCreateWindow: boolean;
+}
+
+interface ProcessedDeleteTask {
+    task: DeleteTask;
+    status: 'pending' | 'executed' | 'expired' | 'cancelled';
+    isInDeleteWindow: boolean;
 }
 
 class FlowScheduleProcessor extends ProcessorBase {
@@ -68,7 +77,11 @@ class FlowScheduleProcessor extends ProcessorBase {
             }
         `;
         const toItems = (res: AxiosResponse) => res.data.data.createTasks;
-        const itemFn = (item: CreateTask) => item;
+        const itemFn = (item: any) => ({
+            ...item,
+            startDate: Number(item.startDate),
+            startDateMaxDelay: Number(item.startDateMaxDelay)
+        });
         return this._queryAllPages(queryFn, toItems, itemFn);
     }
 
@@ -98,57 +111,88 @@ class FlowScheduleProcessor extends ProcessorBase {
         return this._queryAllPages(queryFn, toItems, itemFn);
     }
 
-    private async getCurrentFlowRate(superToken: string, sender: string, receiver: string): Promise<bigint> {
-        const publicClient = createPublicClient({
-            transport: http(this.rpcUrl)
-        });
-        
-        const chainId = await publicClient.getChainId();
-        const sfMetaModule = await import('@superfluid-finance/metadata');
-        const sfMeta = sfMetaModule.default;
-        const network = sfMeta.getNetworkByChainId(chainId);
-        if (!network) throw new Error(`Network not found for chainId ${chainId}`);
-        const cfaAddress = network.contractsV1.cfaV1 as `0x${string}`;
-        
-        const cfaModule = await import("@sfpro/sdk/abi/core");
-        const cfaAbi = cfaModule.cfaAbi;
-        
-        const [timestamp, flowRate, deposited, owed] = await publicClient.readContract({
-            address: cfaAddress,
-            abi: cfaAbi,
-            functionName: 'getFlow',
-            args: [superToken as `0x${string}`, sender as `0x${string}`, receiver as `0x${string}`]
-        }) as [bigint, bigint, bigint, bigint];
-        return flowRate;
+    /**
+     * Determines the status and window state of a create task
+     */
+    private getCreateTaskStatus(task: CreateTask): ProcessedCreateTask {
+        const now = Math.floor(Date.now() / 1000);
+        const isExecuted = task.executedAt !== null;
+        const isCancelled = task.cancelledAt !== null;
+        const isExpired = !isExecuted && !isCancelled && now >= task.expirationAt;
+
+        let status: 'pending' | 'executed' | 'expired' | 'cancelled';
+        if (isExecuted) {
+            status = 'executed';
+        } else if (isCancelled) {
+            status = 'cancelled';
+        } else if (isExpired) {
+            status = 'expired';
+        } else {
+            status = 'pending';
+        }
+
+        // Create window: startDate <= now <= startDate + startDateMaxDelay
+        const isInCreateWindow = status === 'pending' &&
+            task.startDate > 0 && // Task has a start date
+            now >= task.startDate && // Start date has passed
+            now <= (task.startDate + task.startDateMaxDelay); // Within max delay window
+
+        return {
+            task,
+            status,
+            isInCreateWindow
+        };
     }
 
-    public async getOverdueCounts(): Promise<{ createOverdue: number; deleteOverdue: number }> {
+    /**
+     * Determines the status and window state of a delete task
+     */
+    private getDeleteTaskStatus(task: DeleteTask): ProcessedDeleteTask {
         const now = Math.floor(Date.now() / 1000);
-        
-        const createTasks = await this.getCreateTasks();
-        const pendingCreates = createTasks.filter(t => t.executedAt === null && t.cancelledAt === null);
-        
-        const createOverdue = pendingCreates.filter(t => {
-            const timeSinceStart = now - t.executionAt;
-            return timeSinceStart >= OVERDUE_THRESHOLD && now < t.expirationAt;
-        }).length;
-        
-        const deleteTasks = await this.getDeleteTasks();
-        const pendingDeletes = deleteTasks.filter(t => t.executedAt === null && t.cancelledAt === null);
-        
-        let deleteOverdue = 0;
-        for (const task of pendingDeletes) {
-            const timeSinceEnd = now - task.executionAt;
-            if (timeSinceEnd >= OVERDUE_THRESHOLD) {
-                const flowRate = await this.getCurrentFlowRate(task.superToken, task.sender, task.receiver);
-                if (flowRate > 0n) {
-                    deleteOverdue++;
-                }
-            }
+        const isExecuted = task.executedAt !== null;
+        const isCancelled = task.cancelledAt !== null;
+        const isExpired = !isExecuted && !isCancelled && now >= task.expirationAt;
+
+        let status: 'pending' | 'executed' | 'expired' | 'cancelled';
+        if (isExecuted) {
+            status = 'executed';
+        } else if (isCancelled) {
+            status = 'cancelled';
+        } else if (isExpired) {
+            status = 'expired';
+        } else {
+            status = 'pending';
         }
-        
-        return { createOverdue, deleteOverdue };
+
+        // Delete window: endDate <= now (no closing time)
+        const isInDeleteWindow = status === 'pending' &&
+            task.executionAt > 0 && // Task has an execution date
+            now >= task.executionAt; // Execution date has passed
+
+        return {
+            task,
+            status,
+            isInDeleteWindow
+        };
     }
+
+
+    /**
+     * Gets all create tasks with their processed status
+     */
+    public async getProcessedCreateTasks(): Promise<ProcessedCreateTask[]> {
+        const createTasks = await this.getCreateTasks();
+        return createTasks.map(task => this.getCreateTaskStatus(task));
+    }
+
+    /**
+     * Gets all delete tasks with their processed status
+     */
+    public async getProcessedDeleteTasks(): Promise<ProcessedDeleteTask[]> {
+        const deleteTasks = await this.getDeleteTasks();
+        return deleteTasks.map(task => this.getDeleteTaskStatus(task));
+    }
+
 }
 
 async function main() {
@@ -158,70 +202,114 @@ async function main() {
         process.exit(1);
     }
 
+    const verbose = process.env.VERBOSE === 'true';
+
     try {
         const processor = new FlowScheduleProcessor(subgraphUrl, 'unknown', ''); // RPC not needed for this
 
-        const createTasks = await processor.getCreateTasks();
-        const deleteTasks = await processor.getDeleteTasks();
+        const processedCreates = await processor.getProcessedCreateTasks();
+        const processedDeletes = await processor.getProcessedDeleteTasks();
 
         const now = Math.floor(Date.now() / 1000);
 
         // Categorize create tasks
-        const pendingCreates = createTasks.filter(t => t.executedAt === null && t.cancelledAt === null && now < t.expirationAt);
-        const executedCreates = createTasks.filter(t => t.executedAt !== null);
-        const expiredCreates = createTasks.filter(t => t.executedAt === null && t.cancelledAt === null && now >= t.expirationAt);
-        const cancelledCreates = createTasks.filter(t => t.cancelledAt !== null);
+        const pendingCreates = processedCreates.filter(t => t.status === 'pending');
+        const executedCreates = processedCreates.filter(t => t.status === 'executed');
+        const expiredCreates = processedCreates.filter(t => t.status === 'expired');
+        const cancelledCreates = processedCreates.filter(t => t.status === 'cancelled');
 
         // Categorize delete tasks
-        const pendingDeletes = deleteTasks.filter(t => t.executedAt === null && t.cancelledAt === null && now < t.expirationAt);
-        const executedDeletes = deleteTasks.filter(t => t.executedAt !== null);
-        const expiredDeletes = deleteTasks.filter(t => t.executedAt === null && t.cancelledAt === null && now >= t.expirationAt);
-        const cancelledDeletes = deleteTasks.filter(t => t.cancelledAt !== null);
+        const pendingDeletes = processedDeletes.filter(t => t.status === 'pending');
+        const executedDeletes = processedDeletes.filter(t => t.status === 'executed');
+        const expiredDeletes = processedDeletes.filter(t => t.status === 'expired');
+        const cancelledDeletes = processedDeletes.filter(t => t.status === 'cancelled');
 
-        // Print pending creates (always)
-        console.log('\nPending Create Tasks:');
-        console.log('---------------------');
-        pendingCreates.forEach(t => {
-            const timeUntilExecution = t.executionAt - now;
-            console.log(`ID: ${t.id}`);
-            console.log(`SuperToken: ${t.superToken}`);
-            console.log(`Sender: ${t.sender}`);
-            console.log(`Receiver: ${t.receiver}`);
-            console.log(`Flow Rate: ${t.flowRate}`);
-            console.log(`Time until execution: ${formatDuration(timeUntilExecution)}`);
-            if (timeUntilExecution < 0) {
-                console.log(chalk.yellow.bold('(Overdue)'));
+        // Additional categorization for hierarchical summary
+        const createsInWindow = pendingCreates.filter(t => t.isInCreateWindow);
+        const deletesInWindow = pendingDeletes.filter(t => t.isInDeleteWindow);
+
+        // Helper function to print create task details
+        const printCreateTask = (t: ProcessedCreateTask, showAll: boolean = false) => {
+            const timeUntilExecution = t.task.startDate - now;
+            console.log(`ID: ${t.task.id}`);
+            console.log(`SuperToken: ${t.task.superToken}`);
+            console.log(`Sender: ${t.task.sender}`);
+            console.log(`Receiver: ${t.task.receiver}`);
+            console.log(`Flow Rate: ${t.task.flowRate}`);
+            console.log(`Start Date: ${new Date(t.task.startDate * 1000).toISOString()} (max delay: ${formatDuration(t.task.startDateMaxDelay)})`);
+            
+            if (t.isInCreateWindow) {
+                const timeSinceInWindow = now - t.task.startDate;
+                const timeRemainingInWindow = (t.task.startDate + t.task.startDateMaxDelay) - now;
+                console.log(chalk.green.bold(`(Can be executed now - in window for ${formatDuration(timeSinceInWindow)}, remaining ${formatDuration(timeRemainingInWindow)})`));
+            } else if (showAll) {
+                console.log(`(Can be executed in: ${formatDuration(timeUntilExecution)})`);
             }
             console.log('----------------');
-        });
+        };
 
-        console.log('\nPending Delete Tasks:');
-        console.log('---------------------');
-        pendingDeletes.forEach(t => {
-            const timeUntilExecution = t.executionAt - now;
-            console.log(`ID: ${t.id}`);
-            console.log(`SuperToken: ${t.superToken}`);
-            console.log(`Sender: ${t.sender}`);
-            console.log(`Receiver: ${t.receiver}`);
-            console.log(`Time until execution: ${formatDuration(timeUntilExecution)}`);
-            if (timeUntilExecution < 0) {
-                console.log(chalk.yellow.bold('(Overdue)'));
+        // Helper function to print delete task details
+        const printDeleteTask = (t: ProcessedDeleteTask, showAll: boolean = false) => {
+            const timeUntilExecution = t.task.executionAt - now;
+            console.log(`ID: ${t.task.id}`);
+            console.log(`SuperToken: ${t.task.superToken}`);
+            console.log(`Sender: ${t.task.sender}`);
+            console.log(`Receiver: ${t.task.receiver}`);
+            console.log(`Execution Date: ${new Date(t.task.executionAt * 1000).toISOString()}`);
+            
+            if (t.isInDeleteWindow) {
+                const timeSinceInWindow = now - t.task.executionAt;
+                console.log(chalk.yellow.bold(`(Can be executed now - in window for ${formatDuration(timeSinceInWindow)})`));
+            } else if (showAll) {
+                console.log(`(Can be executed in: ${formatDuration(timeUntilExecution)})`);
             }
             console.log('----------------');
-        });
+        };
 
-        // Print summary
+        if (verbose) {
+            // Verbose mode: show all tasks
+            console.log(`Found ${executedCreates.length} executed create tasks`);
+            console.log(`Found ${expiredCreates.length} expired create tasks`);
+            console.log(`Found ${cancelledCreates.length} cancelled create tasks`);
+            console.log(`Found ${pendingCreates.length} pending create tasks`);
+
+            // Sort and print pending creates
+            pendingCreates.sort((a, b) => a.task.startDate - b.task.startDate);
+            console.log('\nPending Create Tasks:');
+            console.log('---------------------');
+            pendingCreates.forEach(t => printCreateTask(t, true));
+
+            // Sort and print pending deletes
+            pendingDeletes.sort((a, b) => a.task.executionAt - b.task.executionAt);
+            console.log('\nPending Delete Tasks:');
+            console.log('---------------------');
+            pendingDeletes.forEach(t => printDeleteTask(t, true));
+
+        } else {
+            // Non-verbose mode: only show tasks in execution windows
+            console.log(`\nCreate Tasks in Window: ${createsInWindow.length}`);
+            console.log('---------------------');
+            createsInWindow.forEach(t => printCreateTask(t, false));
+
+            console.log(`\nDelete Tasks in Window: ${deletesInWindow.length}`);
+            console.log('---------------------');
+            deletesInWindow.forEach(t => printDeleteTask(t, false));
+        }
+
+        // Print summary (same for both verbose and non-verbose modes)
         console.log('\nSummary:');
-        console.log(`Total Create Tasks: ${createTasks.length}`);
-        console.log(`Pending Creates: ${pendingCreates.length}`);
-        console.log(`Executed Creates: ${executedCreates.length}`);
-        console.log(`Expired Creates: ${expiredCreates.length}`);
-        console.log(`Cancelled Creates: ${cancelledCreates.length}`);
-        console.log(`Total Delete Tasks: ${deleteTasks.length}`);
-        console.log(`Pending Deletes: ${pendingDeletes.length}`);
-        console.log(`Executed Deletes: ${executedDeletes.length}`);
-        console.log(`Expired Deletes: ${expiredDeletes.length}`);
-        console.log(`Cancelled Deletes: ${cancelledDeletes.length}`);
+        console.log(`Total Create Tasks: ${processedCreates.length}`);
+        console.log(`  ├─ Pending: ${pendingCreates.length}`);
+        console.log(`  │   └─ In create window: ${createsInWindow.length}`);
+        console.log(`  ├─ Executed: ${executedCreates.length}`);
+        console.log(`  ├─ Expired: ${expiredCreates.length}`);
+        console.log(`  └─ Cancelled: ${cancelledCreates.length}`);
+        console.log(`Total Delete Tasks: ${processedDeletes.length}`);
+        console.log(`  ├─ Pending: ${pendingDeletes.length}`);
+        console.log(`  │   └─ In delete window: ${deletesInWindow.length}`);
+        console.log(`  ├─ Executed: ${executedDeletes.length}`);
+        console.log(`  ├─ Expired: ${expiredDeletes.length}`);
+        console.log(`  └─ Cancelled: ${cancelledDeletes.length}`);
 
     } catch (error) {
         if (axios.isAxiosError(error)) {

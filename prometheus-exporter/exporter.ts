@@ -7,7 +7,7 @@ import express from 'express';
 import { Registry, Gauge } from 'prom-client';
 
 const END_DATE_VALID_BEFORE = 24 * 60 * 60; // 1 day in seconds
-const OVERDUE_THRESHOLD = 2 * 60 * 60; // 2 hours in seconds
+const OVERDUE_THRESHOLD = parseInt(process.env.OVERDUE_THRESHOLD || '7200', 10); // 2 hours in seconds (default), can be overridden via env var
 const UPDATE_INTERVAL = 20 * 60 * 1000; // 20 minutes in milliseconds
 const TWO_DAYS = 2 * 24 * 60 * 60; // 2 days in seconds
 
@@ -96,6 +96,7 @@ class Exporter {
         const sfMeta = sfMetaModule.default;
         const networks = sfMeta.networks;
         
+        console.log(`\nOverdue threshold: ${OVERDUE_THRESHOLD} seconds (${OVERDUE_THRESHOLD / 3600} hours)`);
         console.log('\nInitializing networks:');
         
         networks.forEach(network => {
@@ -222,14 +223,29 @@ class Exporter {
     private async updateFlowMetrics(flowProcessors: FlowScheduleProcessor[]) {
         for (const processor of flowProcessors) {
             try {
-                const { createOverdue, deleteOverdue } = await processor.getOverdueCounts();
+                const processedCreates = await processor.getProcessedCreateTasks();
+                const processedDeletes = await processor.getProcessedDeleteTasks();
+                const now = Math.floor(Date.now() / 1000);
+                
+                // Count create tasks that are overdue for execution
+                const createOverdue = processedCreates.filter(t => {
+                    if (!t.isInCreateWindow) return false;
+                    const timeInWindow = now - t.task.startDate;
+                    return timeInWindow >= OVERDUE_THRESHOLD;
+                }).length;
+
+                // Count delete tasks that are overdue for execution
+                const deleteOverdue = processedDeletes.filter(t => {
+                    if (!t.isInDeleteWindow) return false;
+                    const timeInWindow = now - t.task.executionAt;
+                    return timeInWindow >= OVERDUE_THRESHOLD;
+                }).length;
 
                 this.flowCreateOverdueGauge.set({ network: processor.networkName }, createOverdue);
                 this.flowDeleteOverdueGauge.set({ network: processor.networkName }, deleteOverdue);
 
                 console.log(`[${new Date().toISOString()}] ${processor.networkName} - Updated flow metrics. Create overdue: ${createOverdue}, Delete overdue: ${deleteOverdue}`);
 
-                const now = Math.floor(Date.now() / 1000);
                 this.flowLastSuccessfulUpdate.set({ network: processor.networkName }, now);
             } catch (error) {
                 if (axios.isAxiosError(error)) {

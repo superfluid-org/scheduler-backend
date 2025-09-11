@@ -27,6 +27,7 @@ docker run -p 9090:9090 superfluid-scheduler-exporter
 ## Environment Variables
 
 - `PORT`: Port to expose the Prometheus metrics endpoint (default: 9090)
+- `OVERDUE_THRESHOLD`: Override the overdue threshold in seconds (default: 7200 = 2 hours)
 
 ## Available Metrics
 

@@ -1,13 +1,13 @@
 import axios from 'axios';
 import { VestingScheduleProcessor } from './vestingScheduleProcessor';
-import { FlowScheduleProcessor } from './flowScheduleProcessor';
+import { FlowScheduleProcessor, DELETE_TASK_OUTDATED_CUTOFF } from './flowScheduleProcessor';
 import { AutowrapProcessor } from './autowrapProcessor';
 import { ProcessorBase } from './processorBase';
 import express from 'express';
 import { Registry, Gauge } from 'prom-client';
 
 const END_DATE_VALID_BEFORE = 24 * 60 * 60; // 1 day in seconds
-const OVERDUE_THRESHOLD = 2 * 60 * 60; // 2 hours in seconds
+const OVERDUE_THRESHOLD = parseInt(process.env.OVERDUE_THRESHOLD || '7200', 10); // 2 hours in seconds (default), can be overridden via env var
 const UPDATE_INTERVAL = 20 * 60 * 1000; // 20 minutes in milliseconds
 const TWO_DAYS = 2 * 24 * 60 * 60; // 2 days in seconds
 
@@ -155,9 +155,9 @@ class Exporter {
                 const schedules = await processor.getVestingSchedules();
                 const now = Math.floor(Date.now() / 1000);
                 
-                // Count schedules that are overdue
+                // Count schedules that are overdue for end execution
                 const endOverdueCount = schedules.filter(schedule => {
-                    if (schedule.status !== 'active') return false;
+                    if (!schedule.isInStopWindow) return false;
                     
                     const timeInStopWindow = now - (schedule.schedule.endDate - END_DATE_VALID_BEFORE);
                     return timeInStopWindow >= OVERDUE_THRESHOLD;
@@ -175,12 +175,13 @@ class Exporter {
                 // Update the gauge with network label
                 this.vestingEndOverdueGauge.set({ network: processor.networkName }, endOverdueCount);
                 
+                // Count auto-start schedules that are overdue for start execution
                 const startOverdueCount = schedules.filter(schedule => {
-                    if (schedule.status !== 'not_started') return false;
-                    if (schedule.schedule.claimValidityDate > 0) return false;
+                    if (!schedule.isInStartWindow) return false;
+                    if (schedule.isClaimable) return false; // Only auto-start schedules
                     
-                    const timeSinceStartPossible = now - schedule.schedule.cliffAndFlowDate;
-                    return timeSinceStartPossible >= OVERDUE_THRESHOLD && now < schedule.schedule.cliffAndFlowExpirationAt;
+                    const timeInStartWindow = now - schedule.schedule.cliffAndFlowDate;
+                    return timeInStartWindow >= OVERDUE_THRESHOLD;
                 }).length;
 
                 this.vestingStartOverdueGauge.set({ network: processor.networkName }, startOverdueCount);
@@ -221,14 +222,35 @@ class Exporter {
     private async updateFlowMetrics(flowProcessors: FlowScheduleProcessor[]) {
         for (const processor of flowProcessors) {
             try {
-                const { createOverdue, deleteOverdue } = await processor.getOverdueCounts();
+                const processedCreates = await processor.getProcessedCreateTasks();
+                const processedDeletes = await processor.getProcessedDeleteTasks();
+                const now = Math.floor(Date.now() / 1000);
+                
+                // Count create tasks that are overdue for execution
+                const createOverdue = processedCreates.filter(t => {
+                    if (!t.isInCreateWindow) return false;
+                    const timeInWindow = now - t.task.startDate;
+                    return timeInWindow >= OVERDUE_THRESHOLD;
+                }).length;
+
+                // Count delete tasks that are overdue for execution
+                // Only count tasks that are: in window, flowing, and not outdated
+                const deleteOverdue = processedDeletes.filter(t => {
+                    if (t.status !== 'pending') return false; // Only pending tasks
+                    if (!t.isInDeleteWindow) return false; // Must be in delete window
+                    if (t.isNotFlowing) return false; // Must have active flow
+                    
+                    const timeInWindow = now - t.task.executionAt;
+                    if (timeInWindow > DELETE_TASK_OUTDATED_CUTOFF) return false; // Must not be outdated
+                    
+                    return timeInWindow >= OVERDUE_THRESHOLD; // Must be overdue
+                }).length;
 
                 this.flowCreateOverdueGauge.set({ network: processor.networkName }, createOverdue);
                 this.flowDeleteOverdueGauge.set({ network: processor.networkName }, deleteOverdue);
 
                 console.log(`[${new Date().toISOString()}] ${processor.networkName} - Updated flow metrics. Create overdue: ${createOverdue}, Delete overdue: ${deleteOverdue}`);
 
-                const now = Math.floor(Date.now() / 1000);
                 this.flowLastSuccessfulUpdate.set({ network: processor.networkName }, now);
             } catch (error) {
                 if (axios.isAxiosError(error)) {

@@ -6,6 +6,17 @@ import { createPublicClient, http } from 'viem';
 import { cfaAbi } from "@sfpro/sdk/abi/core";
 import sfMeta from '@superfluid-finance/metadata';
 
+/**
+ * Safety cutoff for delete tasks in execution window (3 days in seconds).
+ * 
+ * This is not a contract concept but an execution safety measure to prevent
+ * processing flows that may be unrelated to the original schedule. If a delete
+ * execution didn't take place and remains lingering and executable forever,
+ * it could potentially process flows that were created after the schedule
+ * was supposed to be executed, leading to unintended flow deletions.
+ */
+export const DELETE_TASK_OUTDATED_CUTOFF = 3 * 24 * 60 * 60; // 3 days in seconds
+
 interface CreateTask {
     id: string;
     createdAt: number;
@@ -229,18 +240,12 @@ class FlowScheduleProcessor extends ProcessorBase {
                 //console.log(`Delete task ${task.id} - active flow found with rate: ${flowState.currentFlowRate.toString()}`);
             }
 
-            // Business logic: Mark as outdated if in delete window for more than 3 days
-            // This is not a contract concept but an execution safety measure to prevent
-            // processing flows that may be unrelated to the original schedule. If a delete
-            // execution didn't take place and remains lingering and executable forever,
-            // it could potentially process flows that were created after the schedule
-            // was supposed to be executed, leading to unintended flow deletions.
+            // Business logic: Mark as outdated if in delete window for more than the safety cutoff
             const timeInWindow = now - task.executionAt;
-            const threeDaysInSeconds = 3 * 24 * 60 * 60; // 3 days
             
-            if (timeInWindow > threeDaysInSeconds) {
+            if (timeInWindow > DELETE_TASK_OUTDATED_CUTOFF) {
                 status = 'outdated';
-                console.log(`Delete task ${task.id} marked as outdated - in window for ${formatDuration(timeInWindow)} (exceeds 3-day safety limit)`);
+                //console.log(`Delete task ${task.id} marked as outdated - in window for ${formatDuration(timeInWindow)} (exceeds ${formatDuration(DELETE_TASK_OUTDATED_CUTOFF)} safety limit)`);
             }
         }
 

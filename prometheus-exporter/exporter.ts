@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { VestingScheduleProcessor } from './vestingScheduleProcessor';
-import { FlowScheduleProcessor } from './flowScheduleProcessor';
+import { FlowScheduleProcessor, DELETE_TASK_OUTDATED_CUTOFF } from './flowScheduleProcessor';
 import { AutowrapProcessor } from './autowrapProcessor';
 import { ProcessorBase } from './processorBase';
 import express from 'express';
@@ -96,7 +96,6 @@ class Exporter {
         const sfMeta = sfMetaModule.default;
         const networks = sfMeta.networks;
         
-        console.log(`\nOverdue threshold: ${OVERDUE_THRESHOLD} seconds (${OVERDUE_THRESHOLD / 3600} hours)`);
         console.log('\nInitializing networks:');
         
         networks.forEach(network => {
@@ -235,10 +234,16 @@ class Exporter {
                 }).length;
 
                 // Count delete tasks that are overdue for execution
+                // Only count tasks that are: in window, flowing, and not outdated
                 const deleteOverdue = processedDeletes.filter(t => {
-                    if (!t.isInDeleteWindow) return false;
+                    if (t.status !== 'pending') return false; // Only pending tasks
+                    if (!t.isInDeleteWindow) return false; // Must be in delete window
+                    if (t.isNotFlowing) return false; // Must have active flow
+                    
                     const timeInWindow = now - t.task.executionAt;
-                    return timeInWindow >= OVERDUE_THRESHOLD;
+                    if (timeInWindow > DELETE_TASK_OUTDATED_CUTOFF) return false; // Must not be outdated
+                    
+                    return timeInWindow >= OVERDUE_THRESHOLD; // Must be overdue
                 }).length;
 
                 this.flowCreateOverdueGauge.set({ network: processor.networkName }, createOverdue);

@@ -116,14 +116,11 @@ async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, 
     const toBeStarted = activeSchedules
         .filter(s => !s.started && !s.failed && s.startDate !== 0 && s.startDate + executionDelayS <= blockTime)
         /* If a flow failed to start, e.g. because of a lack of funds or permission, or automation failure,
-        it may eventually be out of the time window where starting is possible (according to `maxStartDelay` which is defined per schedule).
-        In that case we flag the schedule as failed in order to avoid eternal retrying. */
+        it may eventually be out of the time window where starting is possible (according to `maxStartDelay` which is defined per schedule). */
         .map(s => {
             const overdueSeconds = blockTime - s.startDate;
-            const overdueDays = Number(blockTime - s.startDate) / 86400;
             if (overdueSeconds > s.startMaxDelay) {
-                console.log(`xxx toBeStarted failed ${s.superToken} ${s.sender} ${s.receiver} is ${overdueDays} days out of start time window`);
-                s.failed = true; // will this be persisted?
+                console.log(`~~~ start time window missed for ${s.superToken} ${s.sender} ${s.receiver} by ${overdueSeconds / 86400} days`);
                 return null;
             } else {
                 return s;
@@ -136,10 +133,9 @@ async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, 
             .filter(s => s.started && !s.stopped && !s.failed && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime)
             .map(async s => {
                 /* Flows may have been stopped by sender or receiver, or have run out of funds.
-                Thus before attempting to stop we check if it actually exists. If not we just set the stopped flag. */
+                Thus before attempting to stop we check if it actually exists. */
                 if (await cfaFwd.getFlowrate(s.superToken, s.sender, s.receiver) === 0n) {
-                    console.log(`xxx toBeStopped failed: ${s.superToken} ${s.sender} ${s.receiver} flow doesn't exist`);
-                    s.stopped = true;
+                    console.log(`~~~ skipping delete for inexistent flow: ${s.superToken} ${s.sender} ${s.receiver}`);
                     return null;
                 } else {
                     return s;

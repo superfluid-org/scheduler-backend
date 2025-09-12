@@ -8,6 +8,7 @@ const initStartBlockOverride = process.env.START_BLOCK ? parseInt(process.env.ST
 const endBlockOffset = process.env.END_BLOCK_OFFSET ? parseInt(process.env.END_BLOCK_OFFSET) : 30;
 const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.env.LOGS_QUERY_RANGE) : undefined;
 const executionDelayS = process.env.EXECUTION_DELAY ? parseInt(process.env.EXECUTION_DELAY) : 0;
+const deleteTaskOutdatedCutoff = process.env.DELETE_TASK_OUTDATED_CUTOFF ? parseInt(process.env.DELETE_TASK_OUTDATED_CUTOFF) : 7 * 24 * 3600;
 const dataDir = process.env.DATA_DIR || "data";
 
 // TODO: refactor?
@@ -130,16 +131,23 @@ async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, 
 
     const toBeStopped = (await Promise.all(
         activeSchedules
-            .filter(s => s.started && !s.stopped && !s.failed && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime)
+            .filter(s => !s.stopped && !s.failed && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime)
             .map(async s => {
+                /* If we're far after the end date, there's a risk the flow may not be related to the schedule.
+                That can happen if it was not stopped by the scheduler (e.g. because not running at the end date) and started (again) later.
+                Since there's no unique flow id, we can't know for sure.
+                An alternative approach here could be to make it dependent on flowrate and/or last updated timestamp */
+                if (blockTime > s.endDate + deleteTaskOutdatedCutoff) {
+                    console.log(`!!! skipping delete for flow which is more than ${deleteTaskOutdatedCutoff / 86400} days after the end date: ${s.superToken} ${s.sender} ${s.receiver}`);
+                    return null;
+                }
                 /* Flows may have been stopped by sender or receiver, or have run out of funds.
                 Thus before attempting to stop we check if it actually exists. */
                 if (await cfaFwd.getFlowrate(s.superToken, s.sender, s.receiver) === 0n) {
                     console.log(`~~~ skipping delete for inexistent flow: ${s.superToken} ${s.sender} ${s.receiver}`);
                     return null;
-                } else {
-                    return s;
                 }
+                return s;
             }))
         ).filter(s => s !== null);
 

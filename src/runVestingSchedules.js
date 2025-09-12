@@ -133,10 +133,30 @@ const eventHandlers = {
     }
 };
 
-async function processVestingSchedules(vSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS) {
+async function processVestingSchedules(vSched, signer, activeSchedules, removedSchedules, allowlist, chainId, blockTime, executionDelayS) {
+    // Remove schedules which we know won't be executable now or in the future
+    for (let i = activeSchedules.length - 1; i >= 0; i--) {
+        const s = activeSchedules[i];
+        // claimable schedules not claimed in time for the flow to be started
+        if (s.claimValidityDate > 0 && (blockTime > s.claimValidityDate || blockTime > s.endDate)) {
+            console.log(`~~~ unclaimable or beyond end date: ${s.superToken} ${s.sender} ${s.receiver}`);
+            removedSchedules.push(s);
+            activeSchedules.splice(i, 1);
+        // non-claimable schedules where the flow wasn't started
+        } else if (s.claimValidityDate === 0 && !s.started && s.startDate + executionDelayS <= blockTime) {
+            const dueSinceS = blockTime - s.startDate;
+            if (dueSinceS > startDateValidAfter) {
+                console.log(`~~~ start time window missed for ${s.superToken} ${s.sender} ${s.receiver} by ${dueSinceS - startDateValidAfter} s, removing`);
+                removedSchedules.push(s);
+                activeSchedules.splice(i, 1);
+            }
+        }
+    }
+
     const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime
         && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
-    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate + executionDelayS- endDateValidBefore <= blockTime);
+    // claimable schedules which have been claimed have claimValidityDate set to 0 at this point
+    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate - endDateValidBefore + executionDelayS <= blockTime && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
 
     console.log(`${toBeStarted.length} schedules to be started, ${toBeStopped.length} to be stopped`);
 
@@ -150,8 +170,6 @@ async function processStart(vSched, signer, s) {
     const dueSinceS = blockTime - s.startDate;
     console.log(`dueSinceS: ${dueSinceS}`);
     if (dueSinceS > startDateValidAfter) {
-        console.warn(`### start time window missed for ${s.superToken} ${s.sender} ${s.receiver} by ${dueSinceS - startDateValidAfter} s, skipping`);// TODO: could be removed from state once we're sure about it
-        } else {
         try {
             console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
             const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
@@ -177,14 +195,7 @@ async function processStop(vSched, signer, s) {
         const receipt = await common.executeTx(vSched, signer, "executeEndVesting", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
         console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
     } catch(e) {
-        if (!blockTime > s.endDate) {
-            if (blockTime > s.endDate) {
-                // be less verbose if it's not the first time we're trying to stop
-                console.error(`### stopping failed (again) for ${s.superToken} ${s.sender} ${s.receiver}`);
-            } else {
-                console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
-            }
-        }
+        console.error(`### stopping failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
     }
 }
 
@@ -215,7 +226,7 @@ async function run(customProvider, impersonatedSigner, dataDirOverride) {
 
         const allowlist = await common.loadAllowlist();
 
-        await processVestingSchedules(vSched, signer, activeSchedules, allowlist, chainId, blockTime, executionDelayS);
+        await processVestingSchedules(vSched, signer, activeSchedules, removedSchedules, allowlist, chainId, blockTime, executionDelayS);
     } catch (error) {
         console.error("Error in run function:", error);
         throw error;

@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import { ProcessorBase, formatDuration } from './processorBase';
 
 const END_DATE_VALID_BEFORE = 24 * 60 * 60; // 1 day in seconds
-const START_DATE_VALID_AFTER = 3 * 24 * 60 * 60; // 3 days in seconds
+// on optimisim-sepolia it's 10800 seconds (3 hours)
+const START_DATE_VALID_AFTER = parseInt(process.env.START_DATE_VALID_AFTER || (3 * 24 * 3600).toString(), 10); // 3 days in seconds
 
 interface VestingScheduleEvent {
     id: string;

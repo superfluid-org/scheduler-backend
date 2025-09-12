@@ -8,6 +8,7 @@ const initStartBlockOverride = process.env.START_BLOCK ? parseInt(process.env.ST
 const endBlockOffset = process.env.END_BLOCK_OFFSET ? parseInt(process.env.END_BLOCK_OFFSET) : 30;
 const logsQueryRangeOverride = process.env.LOGS_QUERY_RANGE ? parseInt(process.env.LOGS_QUERY_RANGE) : undefined;
 const executionDelayS = process.env.EXECUTION_DELAY ? parseInt(process.env.EXECUTION_DELAY) : 0;
+const deleteTaskOutdatedCutoff = process.env.DELETE_TASK_OUTDATED_CUTOFF ? parseInt(process.env.DELETE_TASK_OUTDATED_CUTOFF) : 7 * 24 * 3600;
 const dataDir = process.env.DATA_DIR || "data";
 
 // TODO: refactor?
@@ -116,14 +117,11 @@ async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, 
     const toBeStarted = activeSchedules
         .filter(s => !s.started && !s.failed && s.startDate !== 0 && s.startDate + executionDelayS <= blockTime)
         /* If a flow failed to start, e.g. because of a lack of funds or permission, or automation failure,
-        it may eventually be out of the time window where starting is possible (according to `maxStartDelay` which is defined per schedule).
-        In that case we flag the schedule as failed in order to avoid eternal retrying. */
+        it may eventually be out of the time window where starting is possible (according to `maxStartDelay` which is defined per schedule). */
         .map(s => {
             const overdueSeconds = blockTime - s.startDate;
-            const overdueDays = Number(blockTime - s.startDate) / 86400;
             if (overdueSeconds > s.startMaxDelay) {
-                console.log(`xxx toBeStarted failed ${s.superToken} ${s.sender} ${s.receiver} is ${overdueDays} days out of start time window`);
-                s.failed = true; // will this be persisted?
+                console.log(`~~~ start time window missed for ${s.superToken} ${s.sender} ${s.receiver} by ${overdueSeconds / 86400} days`);
                 return null;
             } else {
                 return s;
@@ -133,17 +131,23 @@ async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, 
 
     const toBeStopped = (await Promise.all(
         activeSchedules
-            .filter(s => s.started && !s.stopped && !s.failed && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime)
+            .filter(s => !s.stopped && !s.failed && s.endDate !== 0 && s.endDate + executionDelayS <= blockTime)
             .map(async s => {
-                /* Flows may have been stopped by sender or receiver, or have run out of funds.
-                Thus before attempting to stop we check if it actually exists. If not we just set the stopped flag. */
-                if (await cfaFwd.getFlowrate(s.superToken, s.sender, s.receiver) === 0n) {
-                    console.log(`xxx toBeStopped failed: ${s.superToken} ${s.sender} ${s.receiver} flow doesn't exist`);
-                    s.stopped = true;
+                /* If we're far after the end date, there's a risk the flow may not be related to the schedule.
+                That can happen if it was not stopped by the scheduler (e.g. because not running at the end date) and started (again) later.
+                Since there's no unique flow id, we can't know for sure.
+                An alternative approach here could be to make it dependent on flowrate and/or last updated timestamp */
+                if (blockTime > s.endDate + deleteTaskOutdatedCutoff) {
+                    console.log(`!!! skipping delete for flow which is more than ${deleteTaskOutdatedCutoff / 86400} days after the end date: ${s.superToken} ${s.sender} ${s.receiver}`);
                     return null;
-                } else {
-                    return s;
                 }
+                /* Flows may have been stopped by sender or receiver, or have run out of funds.
+                Thus before attempting to stop we check if it actually exists. */
+                if (await cfaFwd.getFlowrate(s.superToken, s.sender, s.receiver) === 0n) {
+                    console.log(`~~~ skipping delete for inexistent flow: ${s.superToken} ${s.sender} ${s.receiver}`);
+                    return null;
+                }
+                return s;
             }))
         ).filter(s => s !== null);
 

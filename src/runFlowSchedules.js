@@ -138,7 +138,10 @@ async function processFlowSchedules(fSched, signer, activeSchedules, allowlist, 
                 Since there's no unique flow id, we can't know for sure.
                 An alternative approach here could be to make it dependent on flowrate and/or last updated timestamp */
                 if (blockTime > s.endDate + deleteTaskOutdatedCutoff) {
-                    console.log(`!!! skipping delete for flow which is more than ${deleteTaskOutdatedCutoff / 86400} days after the end date: ${s.superToken} ${s.sender} ${s.receiver}`);
+                    // report if it was started by the scheduler
+                    if (s.started) {
+                        console.log(`!!! skipping delete for flow which was started by the scheduler and is more than ${deleteTaskOutdatedCutoff / 86400} days after the end date: ${s.superToken} ${s.sender} ${s.receiver}`);
+                    }
                     return null;
                 }
                 /* Flows may have been stopped by sender or receiver, or have run out of funds.

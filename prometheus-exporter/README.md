@@ -29,6 +29,78 @@ docker run -p 9090:9090 superfluid-scheduler-exporter
 - `PORT`: Port to expose the Prometheus metrics endpoint (default: 9090)
 - `OVERDUE_THRESHOLD`: Override the overdue threshold in seconds (default: 7200 = 2 hours)
 
+## Instatus Integration
+
+The exporter supports optional integration with Instatus for automatic status page incident creation.
+
+### Configuration
+
+- `ENABLE_INSTATUS_REPORTING`: Enable/disable Instatus reporting (default: `false`)
+- `INSTATUS_API_KEY`: Your Instatus API key (required when Instatus reporting is enabled)
+- `instatus-components.json`: Component configuration file (required when Instatus reporting is enabled)
+
+### Docker Usage with Instatus
+
+```bash
+# With Instatus reporting enabled
+docker run -d \
+  --name superfluid-exporter \
+  -p 9090:9090 \
+  -v $(pwd)/instatus-components.json:/app/instatus-components.json:ro \
+  -e ENABLE_INSTATUS_REPORTING=true \
+  -e INSTATUS_API_KEY=xxxxxxxxxxxxxxxxxxxxx \
+  superfluid-scheduler-exporter
+
+# Without Instatus reporting (Prometheus only)
+docker run -d \
+  --name superfluid-exporter \
+  -p 9090:9090 \
+  -e ENABLE_INSTATUS_REPORTING=false \
+  superfluid-scheduler-exporter
+```
+
+### How It Works
+
+The exporter automatically creates Instatus incidents based on scheduler health:
+
+- **Zero overdue items = Healthy**: Creates an "OPERATIONAL" incident
+- **Greater than zero overdue items = Unhealthy**: Creates a "PARTIALOUTAGE" incident
+
+Incidents are created for each processor type:
+- **Vesting Scheduler**: Monitors overdue start and end schedules
+- **Flow Scheduler**: Monitors overdue create and delete tasks
+- **Autowrap Scheduler**: Monitors overdue wrap schedules
+
+### Component Configuration
+
+The `instatus-components.json` file maps network names to Instatus component IDs:
+
+```json
+{
+  "vesting_scheduler": {
+    "pageId": "your-page-id",
+    "networks": {
+      "base-mainnet": { "id": "component-id-1" },
+      "eth-mainnet": { "id": "component-id-2" }
+    }
+  },
+  "flow_scheduler": {
+    "pageId": "your-page-id", 
+    "networks": {
+      "base-mainnet": { "id": "component-id-3" },
+      "eth-mainnet": { "id": "component-id-4" }
+    }
+  },
+  "wrap_scheduler": {
+    "pageId": "your-page-id",
+    "networks": {
+      "base-mainnet": { "id": "component-id-5" },
+      "eth-mainnet": { "id": "component-id-6" }
+    }
+  }
+}
+```
+
 ## Available Metrics
 
 The exporter exposes metrics at the `/metrics` endpoint.

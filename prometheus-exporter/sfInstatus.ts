@@ -155,17 +155,5 @@ async function createIncidentUnhealthy(networkName: string, type: string): Promi
 // Export functions using ES module syntax
 export {
   createIncidentHealthy,
-  createIncidentUnhealthy,
-  getComponentInfo,
-  readComponentsFromFile
-};
-
-// Export types for use in other files
-export type {
-  ComponentInfo,
-  IncidentData,
-  IncidentResponse,
-  ComponentsData,
-  ComponentType,
-  NetworkComponent
+  createIncidentUnhealthy
 };

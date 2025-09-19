@@ -1,7 +1,6 @@
 import { promises as fs } from 'fs';
 import axios, { AxiosResponse } from 'axios';
 
-// Type definitions for the component data structure
 interface NetworkComponent {
   id: string;
 }
@@ -28,11 +27,9 @@ interface IncidentData {
 }
 
 interface IncidentResponse {
-  // Define the response structure based on your needs
   [key: string]: any;
 }
 
-// Environment variable for API key
 const apiKey: string = process.env.INSTATUS_API_KEY || "";
 
 /**
@@ -152,7 +149,6 @@ async function createIncidentUnhealthy(networkName: string, type: string): Promi
   }
 }
 
-// Export functions using ES module syntax
 export {
   createIncidentHealthy,
   createIncidentUnhealthy

@@ -106,6 +106,7 @@ const eventHandlers = {
         removedSchedules.push(activeSchedules[curIndex]);
         activeSchedules.splice(curIndex, 1);
     },
+    // This is also emitted when claiming
     VestingCliffAndFlowExecuted: (e, activeSchedules) => {
         console.log(`STARTED: ${e.superToken} ${e.sender} ${e.receiver}`);
         const curIndex = getIndexOf(activeSchedules, e.superToken, e.sender, e.receiver);
@@ -155,8 +156,9 @@ async function processVestingSchedules(vSched, signer, activeSchedules, removedS
 
     const toBeStarted = activeSchedules.filter(s => !s.started && s.startDate + executionDelayS <= blockTime
         && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
-    // claimable schedules which have been claimed have claimValidityDate set to 0 at this point
-    const toBeStopped = activeSchedules.filter(s => !s.stopped && s.endDate !== 0 && s.endDate - endDateValidBefore + executionDelayS <= blockTime && (s.claimValidityDate === undefined || s.claimValidityDate === 0));
+
+    // regardless if claimable or not, we know that the `started` flag will be set if the flow is running and needs to be stopped by us
+    const toBeStopped = activeSchedules.filter(s => s.started && !s.stopped && s.endDate !== 0 && s.endDate - endDateValidBefore + executionDelayS <= blockTime);
 
     console.log(`${toBeStarted.length} schedules to be started, ${toBeStopped.length} to be stopped`);
 

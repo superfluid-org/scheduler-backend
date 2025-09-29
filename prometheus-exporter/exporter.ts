@@ -38,11 +38,7 @@ class Exporter {
         this.registry = new Registry();
         
         // Log Instatus reporting status
-        if (ENABLE_INSTATUS_REPORTING) {
-            console.log('Instatus reporting is ENABLED');
-        } else {
-            console.log('Instatus reporting is DISABLED (set ENABLE_INSTATUS_REPORTING=true to enable)');
-        }
+        console.log(`Instatus reporting is ${ENABLE_INSTATUS_REPORTING ? "ENABLED" : "DISABLED (set ENABLE_INSTATUS_REPORTING=true to enable)"}`);
         
         this.vestingStartOverdueGauge = new Gauge({
             name: 'vesting_start_overdue',
@@ -186,7 +182,8 @@ class Exporter {
                 // Create incidents based on overdue counts (only if Instatus reporting is enabled)
                 if (ENABLE_INSTATUS_REPORTING) {
                     // Zero count = healthy, greater than zero = unhealthy
-                    if (startOverdueCount === 0) {
+                    const totalOverdue = startOverdueCount + endOverdueCount;
+                    if (totalOverdue === 0) {
                         await createIncidentHealthy(processor.networkName, 'vesting_scheduler');
                     } else {
                         await createIncidentUnhealthy(processor.networkName, 'vesting_scheduler');

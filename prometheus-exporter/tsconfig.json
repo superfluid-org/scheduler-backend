@@ -2,14 +2,17 @@
     "compilerOptions": {
         "target": "ES2022",
         "module": "NodeNext",
-        "lib": ["ES2020"],
+        "lib": ["ES2022"],
         "strict": true,
         "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "outDir": "./dist",
         "rootDir": ".",
-        "moduleResolution": "NodeNext"
+        "moduleResolution": "NodeNext",
+        "allowImportingTsExtensions": false,
+        "noEmit": false
     },
     "include": [
         "**/*"
@@ -17,4 +20,4 @@
     "exclude": [
         "node_modules"
     ]
-} 
+}

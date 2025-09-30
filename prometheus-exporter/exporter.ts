@@ -5,11 +5,15 @@ import { AutowrapProcessor } from './autowrapProcessor';
 import { ProcessorBase } from './processorBase';
 import express from 'express';
 import { Registry, Gauge } from 'prom-client';
+import { createIncidentHealthy, createIncidentUnhealthy } from './sfInstatus';
 
 const END_DATE_VALID_BEFORE = 24 * 60 * 60; // 1 day in seconds
 const OVERDUE_THRESHOLD = parseInt(process.env.OVERDUE_THRESHOLD || '7200', 10); // 2 hours in seconds (default), can be overridden via env var
 const UPDATE_INTERVAL = 20 * 60 * 1000; // 20 minutes in milliseconds
 const TWO_DAYS = 2 * 24 * 60 * 60; // 2 days in seconds
+
+// Environment variable to enable/disable Instatus reporting
+const ENABLE_INSTATUS_REPORTING = process.env.ENABLE_INSTATUS_REPORTING === 'true';
 
 class Exporter {
     private readonly processors: ProcessorBase[];
@@ -32,6 +36,9 @@ class Exporter {
     constructor() {
         this.processors = [];
         this.registry = new Registry();
+        
+        // Log Instatus reporting status
+        console.log(`Instatus reporting is ${ENABLE_INSTATUS_REPORTING ? "ENABLED" : "DISABLED (set ENABLE_INSTATUS_REPORTING=true to enable)"}`);
         
         this.vestingStartOverdueGauge = new Gauge({
             name: 'vesting_start_overdue',
@@ -163,6 +170,26 @@ class Exporter {
                     return timeInStopWindow >= OVERDUE_THRESHOLD;
                 }).length;
 
+                // Count auto-start schedules that are overdue for start execution
+                const startOverdueCount = schedules.filter(schedule => {
+                    if (!schedule.isInStartWindow) return false;
+                    if (schedule.isClaimable) return false; // Only auto-start schedules
+                    
+                    const timeInStartWindow = now - schedule.schedule.cliffAndFlowDate;
+                    return timeInStartWindow >= OVERDUE_THRESHOLD;
+                }).length;
+
+                // Create incidents based on overdue counts (only if Instatus reporting is enabled)
+                if (ENABLE_INSTATUS_REPORTING) {
+                    // Zero count = healthy, greater than zero = unhealthy
+                    const totalOverdue = startOverdueCount + endOverdueCount;
+                    if (totalOverdue === 0) {
+                        await createIncidentHealthy(processor.networkName, 'vesting_scheduler');
+                    } else {
+                        await createIncidentUnhealthy(processor.networkName, 'vesting_scheduler');
+                    }
+                }
+
                 // Find schedules ending in next 2 days
                 const endingSoon = schedules
                     .filter(schedule => {
@@ -174,16 +201,6 @@ class Exporter {
 
                 // Update the gauge with network label
                 this.vestingEndOverdueGauge.set({ network: processor.networkName }, endOverdueCount);
-                
-                // Count auto-start schedules that are overdue for start execution
-                const startOverdueCount = schedules.filter(schedule => {
-                    if (!schedule.isInStartWindow) return false;
-                    if (schedule.isClaimable) return false; // Only auto-start schedules
-                    
-                    const timeInStartWindow = now - schedule.schedule.cliffAndFlowDate;
-                    return timeInStartWindow >= OVERDUE_THRESHOLD;
-                }).length;
-
                 this.vestingStartOverdueGauge.set({ network: processor.networkName }, startOverdueCount);
 
                 console.log(`[${new Date().toISOString()}] ${processor.networkName} - Updated vesting metrics:`);
@@ -246,6 +263,17 @@ class Exporter {
                     return timeInWindow >= OVERDUE_THRESHOLD; // Must be overdue
                 }).length;
 
+                // Create incidents based on overdue counts (only if Instatus reporting is enabled)
+                if (ENABLE_INSTATUS_REPORTING) {
+                    // Zero count = healthy, greater than zero = unhealthy
+                    const totalOverdue = createOverdue + deleteOverdue;
+                    if (totalOverdue === 0) {
+                        await createIncidentHealthy(processor.networkName, 'flow_scheduler');
+                    } else {
+                        await createIncidentUnhealthy(processor.networkName, 'flow_scheduler');
+                    }
+                }
+
                 this.flowCreateOverdueGauge.set({ network: processor.networkName }, createOverdue);
                 this.flowDeleteOverdueGauge.set({ network: processor.networkName }, deleteOverdue);
 
@@ -272,6 +300,16 @@ class Exporter {
                 const overdueCount = schedules.filter(schedule => {
                     return schedule.due_since > 0 && (now - schedule.due_since) > OVERDUE_THRESHOLD;
                 }).length;
+
+                // Create incidents based on overdue counts (only if Instatus reporting is enabled)
+                if (ENABLE_INSTATUS_REPORTING) {
+                    // Zero count = healthy, greater than zero = unhealthy
+                    if (overdueCount === 0) {
+                        await createIncidentHealthy(processor.networkName, 'wrap_scheduler');
+                    } else {
+                        await createIncidentUnhealthy(processor.networkName, 'wrap_scheduler');
+                    }
+                }
 
                 // Update the gauge with network label
                 this.autowrapOverdueGauge.set({ network: processor.networkName }, overdueCount);
@@ -354,4 +392,4 @@ if (require.main === module) {
     });
 }
 
-export { Exporter }; 
+export { Exporter };

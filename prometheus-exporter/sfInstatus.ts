@@ -91,7 +91,7 @@ async function createIncidentHealthy(networkName: string, type: string): Promise
     const url = `https://api.instatus.com/v1/${componentInfo.pageId}/components/${componentInfo.id}`;
     
     const incidentData: IncidentData = {
-      name: `${networkName} Protocol Subgraph`,
+      name: `${networkName} ${type} event`,
       message: `Network ${networkName} is healthy.`,
       status: "OPERATIONAL",
       components: [componentInfo.id]
@@ -126,7 +126,7 @@ async function createIncidentUnhealthy(networkName: string, type: string): Promi
     const url = `https://api.instatus.com/v1/${componentInfo.pageId}/components/${componentInfo.id}`;
     
     const incidentData: IncidentData = {
-      name: `${networkName} Protocol Subgraph`,
+      name: `${networkName} ${type} event`,
       message: `Network ${networkName} is experiencing issues.`,
       status: "PARTIALOUTAGE",
       components: [componentInfo.id]

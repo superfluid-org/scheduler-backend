@@ -172,13 +172,14 @@ async function processStart(vSched, signer, s) {
     const dueSinceS = blockTime - s.startDate;
     console.log(`dueSinceS: ${dueSinceS}`);
     if (dueSinceS > startDateValidAfter) {
-        try {
-            console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
-            const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
-            console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
-        } catch(e) {
-            console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
-        }
+        console.warn(`!!! starting overdue, start time missed for ${s.superToken} ${s.sender} ${s.receiver} by ${dueSinceS - startDateValidAfter} s !!!`);
+    }
+    try {
+        console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
+        const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
+        console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
+    } catch(e) {
+        console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
     }
 }
 

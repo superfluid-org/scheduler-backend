@@ -494,10 +494,10 @@
     "@sentry/types" "5.30.0"
     tslib "^1.9.3"
 
-"@superfluid-finance/metadata@^1.6.1":
-  version "1.6.1"
-  resolved "https://registry.yarnpkg.com/@superfluid-finance/metadata/-/metadata-1.6.1.tgz#aefde563fa59f6aaa2404644d443166515a86ef7"
-  integrity sha512-vUJj9p9wuZ55E1zVBlGbJBztHLEQOp4m4ON/ImQnDdrRotOrOVAVJa59i4PmFuMdOyAPEMwVGUrGshaLtmPqKg==
+"@superfluid-finance/metadata@^1.6.2":
+  version "1.6.2"
+  resolved "https://registry.yarnpkg.com/@superfluid-finance/metadata/-/metadata-1.6.2.tgz#2dfc9a79520b76486c8bc010393f2293fb14d12f"
+  integrity sha512-oxKBlzMNl2hX6tF0ot8W4kJ86pmtq3DFaoalsguBuIOGmrp7nGAvQ7nYRmd3WDu+vGwrgQYyBlIKSEuPy8addg==
 
 "@tsconfig/node10@^1.0.7":
   version "1.0.11"

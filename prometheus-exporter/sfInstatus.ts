@@ -5,13 +5,9 @@ interface NetworkComponent {
   id: string;
 }
 
-interface ComponentType {
+interface ComponentsData {
   pageId: string;
   networks: Record<string, NetworkComponent>;
-}
-
-interface ComponentsData {
-  [type: string]: ComponentType;
 }
 
 interface ComponentInfo {
@@ -49,9 +45,10 @@ async function readComponentsFromFile(filePath: string): Promise<ComponentsData>
 }
 
 /**
- * Gets component ID and pageId by network name and type
+ * Gets component ID and pageId by network name
+ * All scheduler types (vesting, flow, wrap) share the same component ID per network
  * @param networkName - Name of the network
- * @param type - Type of the component (wrap_scheduler, vesting_scheduler, flow_scheduler)
+ * @param type - Type of the component (wrap_scheduler, vesting_scheduler, flow_scheduler) - used for logging only
  * @returns Promise resolving to component info
  */
 async function getComponentInfo(networkName: string, type: string): Promise<ComponentInfo> {
@@ -60,17 +57,13 @@ async function getComponentInfo(networkName: string, type: string): Promise<Comp
   try {
     const components = await readComponentsFromFile(filePath);
     
-    if (!components[type]) {
-      throw new Error(`Type ${type} not found in components`);
-    }
-    
-    if (!components[type].networks[networkName]) {
-      throw new Error(`Network ${networkName} not found in type ${type}`);
+    if (!components.networks[networkName]) {
+      throw new Error(`Network ${networkName} not found in components`);
     }
     
     return {
-      id: components[type].networks[networkName].id,
-      pageId: components[type].pageId
+      id: components.networks[networkName].id,
+      pageId: components.pageId
     };
   } catch (err) {
     const error = err as Error;
@@ -91,8 +84,8 @@ async function createIncidentHealthy(networkName: string, type: string): Promise
     const url = `https://api.instatus.com/v1/${componentInfo.pageId}/components/${componentInfo.id}`;
     
     const incidentData: IncidentData = {
-      name: `${networkName} ${type} event`,
-      message: `Network ${networkName} is healthy.`,
+      name: `${networkName} scheduler event`,
+      message: `Network ${networkName} schedulers (${type}) are healthy.`,
       status: "OPERATIONAL",
       components: [componentInfo.id]
     };
@@ -126,8 +119,8 @@ async function createIncidentUnhealthy(networkName: string, type: string): Promi
     const url = `https://api.instatus.com/v1/${componentInfo.pageId}/components/${componentInfo.id}`;
     
     const incidentData: IncidentData = {
-      name: `${networkName} ${type} event`,
-      message: `Network ${networkName} is experiencing issues.`,
+      name: `${networkName} scheduler event`,
+      message: `Network ${networkName} schedulers (${type}) are experiencing issues.`,
       status: "PARTIALOUTAGE",
       components: [componentInfo.id]
     };

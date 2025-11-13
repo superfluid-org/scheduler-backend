@@ -5,13 +5,9 @@ interface NetworkComponent {
   id: string;
 }
 
-interface ComponentType {
+interface ComponentsData {
   pageId: string;
   networks: Record<string, NetworkComponent>;
-}
-
-interface ComponentsData {
-  [type: string]: ComponentType;
 }
 
 interface ComponentInfo {
@@ -19,11 +15,10 @@ interface ComponentInfo {
   pageId: string;
 }
 
-interface IncidentData {
+interface ComponentUpdate {
   name: string;
-  message: string;
   status: 'OPERATIONAL' | 'PARTIALOUTAGE';
-  components: string[];
+  grouped: boolean;
 }
 
 interface IncidentResponse {
@@ -49,9 +44,10 @@ async function readComponentsFromFile(filePath: string): Promise<ComponentsData>
 }
 
 /**
- * Gets component ID and pageId by network name and type
+ * Gets component ID and pageId by network name
+ * All scheduler types (vesting, flow, wrap) share the same component ID per network
  * @param networkName - Name of the network
- * @param type - Type of the component (wrap_scheduler, vesting_scheduler, flow_scheduler)
+ * @param type - Type of the component (wrap_scheduler, vesting_scheduler, flow_scheduler) - used for logging only
  * @returns Promise resolving to component info
  */
 async function getComponentInfo(networkName: string, type: string): Promise<ComponentInfo> {
@@ -60,17 +56,13 @@ async function getComponentInfo(networkName: string, type: string): Promise<Comp
   try {
     const components = await readComponentsFromFile(filePath);
     
-    if (!components[type]) {
-      throw new Error(`Type ${type} not found in components`);
-    }
-    
-    if (!components[type].networks[networkName]) {
-      throw new Error(`Network ${networkName} not found in type ${type}`);
+    if (!components.networks[networkName]) {
+      throw new Error(`Network ${networkName} not found in components`);
     }
     
     return {
-      id: components[type].networks[networkName].id,
-      pageId: components[type].pageId
+      id: components.networks[networkName].id,
+      pageId: components.pageId
     };
   } catch (err) {
     const error = err as Error;
@@ -80,71 +72,85 @@ async function getComponentInfo(networkName: string, type: string): Promise<Comp
 }
 
 /**
- * Creates an incident for a healthy component
+ * Updates component status to healthy (operational)
  * @param networkName - Name of the network
- * @param type - Type of the component
- * @returns Promise resolving to the incident response
+ * @param type - Type of the component (used for logging only)
+ * @returns Promise resolving to the component update response
  */
 async function createIncidentHealthy(networkName: string, type: string): Promise<IncidentResponse | undefined> {
   try {
     const componentInfo = await getComponentInfo(networkName, type);
-    const url = `https://api.instatus.com/v1/${componentInfo.pageId}/components/${componentInfo.id}`;
+    const url = `https://api.instatus.com/v2/${componentInfo.pageId}/components/${componentInfo.id}`;
     
-    const incidentData: IncidentData = {
-      name: `${networkName} ${type} event`,
-      message: `Network ${networkName} is healthy.`,
+    const componentData: ComponentUpdate = {
+      name: `${networkName} Scheduler`,
       status: "OPERATIONAL",
-      components: [componentInfo.id]
+      grouped: true
     };
 
-    const response: AxiosResponse<IncidentResponse> = await axios.put(url, incidentData, {
+    console.log(`[Instatus] Updating component "${componentData.name}" (ID: ${componentInfo.id}) to OPERATIONAL for network ${networkName} (type: ${type})`);
+
+    const response: AxiosResponse<IncidentResponse> = await axios.put(url, componentData, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       }
     });
     
-    console.log(`Created healthy incident for component ${componentInfo.id} and network ${networkName} (${type})`);
+    console.log(`[Instatus] ✓ Successfully updated component ${componentInfo.id} to OPERATIONAL for network ${networkName}`);
     return response.data;
   } catch (err) {
     const axiosError = err as any;
-    console.error(`Error creating healthy incident for network ${networkName}-${type}:`, 
-      axiosError.response ? axiosError.response.data : axiosError.message);
+    console.error(`[Instatus] ✗ Failed to update component to OPERATIONAL for network ${networkName} (type: ${type}):`, 
+      axiosError.response?.data || axiosError.message);
+    if (axiosError.response?.data) {
+      console.error(`[Instatus] Error details:`, JSON.stringify(axiosError.response.data, null, 2));
+    }
+    if (axiosError.response?.config) {
+      console.error(`[Instatus] Request URL: ${axiosError.response.config.url}`);
+    }
     return undefined;
   }
 }
 
 /**
- * Creates an incident for an unhealthy component
+ * Updates component status to unhealthy (partial_outage)
  * @param networkName - Name of the network
- * @param type - Type of the component
- * @returns Promise resolving to the incident response
+ * @param type - Type of the component (used for logging only)
+ * @returns Promise resolving to the component update response
  */
 async function createIncidentUnhealthy(networkName: string, type: string): Promise<IncidentResponse | undefined> {
   try {
     const componentInfo = await getComponentInfo(networkName, type);
-    const url = `https://api.instatus.com/v1/${componentInfo.pageId}/components/${componentInfo.id}`;
+    const url = `https://api.instatus.com/v2/${componentInfo.pageId}/components/${componentInfo.id}`;
     
-    const incidentData: IncidentData = {
-      name: `${networkName} ${type} event`,
-      message: `Network ${networkName} is experiencing issues.`,
+    const componentData: ComponentUpdate = {
+      name: `${networkName} Scheduler`,
       status: "PARTIALOUTAGE",
-      components: [componentInfo.id]
+      grouped: true
     };
 
-    const response: AxiosResponse<IncidentResponse> = await axios.put(url, incidentData, {
+    console.log(`[Instatus] Updating component "${componentData.name}" (ID: ${componentInfo.id}) to PARTIALOUTAGE for network ${networkName} (type: ${type})`);
+
+    const response: AxiosResponse<IncidentResponse> = await axios.put(url, componentData, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       }
     });
     
-    console.log(`Created unhealthy incident for component ${componentInfo.id} and network ${networkName} (${type})`);
+    console.log(`[Instatus] ✓ Successfully updated component ${componentInfo.id} to PARTIALOUTAGE for network ${networkName}`);
     return response.data;
   } catch (err) {
     const axiosError = err as any;
-    console.error(`Error creating unhealthy incident for network ${networkName}-${type}:`, 
-      axiosError.response ? axiosError.response.data : axiosError.message);
+    console.error(`[Instatus] ✗ Failed to update component to PARTIALOUTAGE for network ${networkName} (type: ${type}):`, 
+      axiosError.response?.data || axiosError.message);
+    if (axiosError.response?.data) {
+      console.error(`[Instatus] Error details:`, JSON.stringify(axiosError.response.data, null, 2));
+    }
+    if (axiosError.response?.config) {
+      console.error(`[Instatus] Request URL: ${axiosError.response.config.url}`);
+    }
     return undefined;
   }
 }

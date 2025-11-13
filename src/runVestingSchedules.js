@@ -139,15 +139,15 @@ async function processVestingSchedules(vSched, signer, activeSchedules, removedS
     for (let i = activeSchedules.length - 1; i >= 0; i--) {
         const s = activeSchedules[i];
         // claimable schedules not claimed in time for the flow to be started
-        if (s.claimValidityDate > 0 && (blockTime > s.claimValidityDate || blockTime > s.endDate)) {
-            console.log(`~~~ unclaimable or beyond end date: ${s.superToken} ${s.sender} ${s.receiver}`);
+        if (s.claimValidityDate > 0 && ! s.started && (blockTime > s.claimValidityDate || blockTime > s.endDate)) {
+            console.log(`~~~ skipping: unclaimable (claim validity date of schedule end date reached before claiming): ${s.superToken} ${s.sender} ${s.receiver}`);
             removedSchedules.push(s);
             activeSchedules.splice(i, 1);
         // non-claimable schedules where the flow wasn't started
         } else if (s.claimValidityDate === 0 && !s.started && s.startDate + executionDelayS <= blockTime) {
             const dueSinceS = blockTime - s.startDate;
             if (dueSinceS > startDateValidAfter) {
-                console.log(`~~~ start time window missed for ${s.superToken} ${s.sender} ${s.receiver} by ${dueSinceS - startDateValidAfter} s, removing`);
+                console.log(`~~~ skipping: start time window missed for ${s.superToken} ${s.sender} ${s.receiver} by ${dueSinceS - startDateValidAfter} s`);
                 removedSchedules.push(s);
                 activeSchedules.splice(i, 1);
             }
@@ -172,13 +172,14 @@ async function processStart(vSched, signer, s) {
     const dueSinceS = blockTime - s.startDate;
     console.log(`dueSinceS: ${dueSinceS}`);
     if (dueSinceS > startDateValidAfter) {
-        try {
-            console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
-            const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
-            console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
-        } catch(e) {
-            console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
-        }
+        console.warn(`!!! starting overdue, start time missed for ${s.superToken} ${s.sender} ${s.receiver} by ${dueSinceS - startDateValidAfter} s !!!`);
+    }
+    try {
+        console.log(`+++ starting: ${s.superToken} ${s.sender} ${s.receiver}`);
+        const receipt = await common.executeTx(vSched, signer, "executeCliffAndFlow", { superToken: s.superToken, sender: s.sender, receiver: s.receiver });
+        console.log(`+++ receipt: ${JSON.stringify(receipt)}`);
+    } catch(e) {
+        console.error(`### starting failed for ${s.superToken} ${s.sender} ${s.receiver}: ${e}`);
     }
 }
 

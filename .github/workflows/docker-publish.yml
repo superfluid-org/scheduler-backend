@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: d10r/scheduler-exporter
+  IMAGE_NAME: superfluid-org/scheduler-exporter
 
 jobs:
   build-and-push:

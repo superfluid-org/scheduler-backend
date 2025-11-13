@@ -73,29 +73,17 @@ Incidents are created for each processor type:
 
 ### Component Configuration
 
-The `instatus-components.json` file maps network names to Instatus component IDs:
+The `instatus-components.json` file maps networks to their Instatus component IDs. Each network has a single component ID that represents all three scheduler types (vesting, flow, and wrap). If any of the three schedulers are unhealthy for a network, the same component is updated. The `pageId` is shared across all networks:
 
 ```json
 {
-  "vesting_scheduler": {
-    "pageId": "your-page-id",
-    "networks": {
-      "base-mainnet": { "id": "component-id-1" },
-      "eth-mainnet": { "id": "component-id-2" }
-    }
-  },
-  "flow_scheduler": {
-    "pageId": "your-page-id", 
-    "networks": {
-      "base-mainnet": { "id": "component-id-3" },
-      "eth-mainnet": { "id": "component-id-4" }
-    }
-  },
-  "wrap_scheduler": {
-    "pageId": "your-page-id",
-    "networks": {
-      "base-mainnet": { "id": "component-id-5" },
-      "eth-mainnet": { "id": "component-id-6" }
+  "pageId": "your-page-id",
+  "networks": {
+    "base-mainnet": {
+      "id": "component-id-1"
+    },
+    "eth-mainnet": {
+      "id": "component-id-2"
     }
   }
 }

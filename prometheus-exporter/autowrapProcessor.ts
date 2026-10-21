@@ -32,6 +32,9 @@ interface ProcessedWrapSchedule {
   schedule: WrapSchedule;
   due_since: number;
   due_since_with_gda: number;
+  // due, but the wrap would revert: required wrap amount exceeds the user's
+  // liquidity-token balance or allowance. Not actionable by the keeper.
+  blocked_on_user_funds: boolean;
 }
 
 class AutowrapProcessor extends ProcessorBase {
@@ -61,7 +64,7 @@ class AutowrapProcessor extends ProcessorBase {
     const now = Math.floor(Date.now() / 1000);
 
     if (!schedule.isActive || schedule.deletedAt !== null || now >= schedule.expiredAt) {
-      return { schedule, due_since: 0, due_since_with_gda: 0 };
+      return { schedule, due_since: 0, due_since_with_gda: 0, blocked_on_user_funds: false };
     }
 
     const manager = schedule.manager as `0x${string}`;
@@ -77,6 +80,23 @@ class AutowrapProcessor extends ProcessorBase {
     const liquidityToken = schedule.liquidityToken as `0x${string}`;
     const strategy = schedule.strategy as `0x${string}`;
 
+    // The manager's checkWrap is the keeper's execution trigger: it returns the
+    // exact amount the strategy would transferFrom the user. Returns 0n on error
+    // (fail open: an unclassifiable schedule stays visible as overdue).
+    const safeCheckWrap = async (): Promise<bigint> => {
+      try {
+        return await publicClient.readContract({
+          address: manager,
+          abi: autoWrapManagerAbi,
+          functionName: 'checkWrap',
+          args: [account, superToken, liquidityToken]
+        }) as bigint;
+      } catch (error) {
+        console.warn(`[${this.networkName}] checkWrap failed for ${schedule.id}, treating as not blocked:`, error);
+        return 0n;
+      }
+    };
+
     const allowance = await publicClient.readContract({
       address: liquidityToken,
       abi: erc20Abi,
@@ -85,7 +105,7 @@ class AutowrapProcessor extends ProcessorBase {
     }) as bigint;
 
     if (allowance === 0n) {
-      return { schedule, due_since: 0, due_since_with_gda: 0 };
+      return { schedule, due_since: 0, due_since_with_gda: 0, blocked_on_user_funds: (await safeCheckWrap()) > 0n };
     }
 
     const liqBalance = await publicClient.readContract({
@@ -96,7 +116,7 @@ class AutowrapProcessor extends ProcessorBase {
     }) as bigint;
 
     if (liqBalance === 0n) {
-      return { schedule, due_since: 0, due_since_with_gda: 0 };
+      return { schedule, due_since: 0, due_since_with_gda: 0, blocked_on_user_funds: (await safeCheckWrap()) > 0n };
     }
 
     const isSupported = await publicClient.readContract({
@@ -107,7 +127,7 @@ class AutowrapProcessor extends ProcessorBase {
     }) as boolean;
 
     if (!isSupported) {
-      return { schedule, due_since: 0, due_since_with_gda: 0 };
+      return { schedule, due_since: 0, due_since_with_gda: 0, blocked_on_user_funds: false };
     }
 
     const cfaNetFlow = await publicClient.readContract({
@@ -160,7 +180,22 @@ class AutowrapProcessor extends ProcessorBase {
       }
     }
 
-    return { schedule, due_since, due_since_with_gda };
+    // Verify the user can actually fund the wrap: the manager's checkWrap
+    // is the keeper's execution trigger and returns the exact amount the
+    // strategy would transferFrom. If it exceeds balance or allowance,
+    // executeWrap reverts (e.g. "BEP20: transfer amount exceeds balance")
+    // and the keeper can never clear the schedule - that is a user problem,
+    // not an overdue execution. Checked independently of due_since because
+    // the contract's due condition can diverge from the projection above.
+    let blocked_on_user_funds = false;
+    const wrapAmount = await safeCheckWrap();
+    const available = liqBalance < allowance ? liqBalance : allowance;
+    if (wrapAmount > 0n && wrapAmount > available) {
+      blocked_on_user_funds = true;
+      console.log(chalk.yellow(`[${this.networkName}] wrap schedule ${schedule.id} blocked on user funds: needs ${wrapAmount}, available ${available} (balance ${liqBalance}, allowance ${allowance})`));
+    }
+
+    return { schedule, due_since, due_since_with_gda, blocked_on_user_funds };
   }
 
   public async getAutowrapSchedules(): Promise<ProcessedWrapSchedule[]> {

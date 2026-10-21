@@ -22,6 +22,7 @@ class Exporter {
     // gauges
     private readonly vestingEndOverdueGauge: Gauge;
     private readonly autowrapOverdueGauge: Gauge;
+    private readonly autowrapBlockedGauge: Gauge;
     private readonly vestingStartOverdueGauge: Gauge;
     private readonly flowCreateOverdueGauge: Gauge;
     private readonly flowDeleteOverdueGauge: Gauge;
@@ -71,6 +72,13 @@ class Exporter {
         this.autowrapOverdueGauge = new Gauge({
             name: 'autowrap_overdue',
             help: 'Number of autowrap schedules that are overdue for execution',
+            labelNames: ['network'],
+            registers: [this.registry]
+        });
+
+        this.autowrapBlockedGauge = new Gauge({
+            name: 'autowrap_blocked',
+            help: 'Number of due autowrap schedules blocked on insufficient user balance or allowance (excluded from autowrap_overdue)',
             labelNames: ['network'],
             registers: [this.registry]
         });
@@ -296,10 +304,15 @@ class Exporter {
                 const schedules = await processor.getAutowrapSchedules();
                 const now = Math.floor(Date.now() / 1000);
                 
-                // Count schedules that are overdue
+                // Count schedules that are overdue; schedules the keeper cannot
+                // execute because the user lacks funds/allowance are tracked
+                // separately and do not count as overdue (or page anyone)
                 const overdueCount = schedules.filter(schedule => {
-                    return schedule.due_since > 0 && (now - schedule.due_since) > OVERDUE_THRESHOLD;
+                    return schedule.due_since > 0 && (now - schedule.due_since) > OVERDUE_THRESHOLD
+                        && !schedule.blocked_on_user_funds;
                 }).length;
+
+                const blockedCount = schedules.filter(schedule => schedule.blocked_on_user_funds).length;
 
                 // Create incidents based on overdue counts (only if Instatus reporting is enabled)
                 if (ENABLE_INSTATUS_REPORTING) {
@@ -311,10 +324,11 @@ class Exporter {
                     }
                 }
 
-                // Update the gauge with network label
+                // Update the gauges with network label
                 this.autowrapOverdueGauge.set({ network: processor.networkName }, overdueCount);
-                
-                console.log(`[${new Date().toISOString()}] ${processor.networkName} - Updated autowrap metrics. Overdue schedules: ${overdueCount}`);
+                this.autowrapBlockedGauge.set({ network: processor.networkName }, blockedCount);
+
+                console.log(`[${new Date().toISOString()}] ${processor.networkName} - Updated autowrap metrics. Overdue schedules: ${overdueCount}, blocked on user funds: ${blockedCount}`);
 
                 this.autowrapLastSuccessfulUpdate.set({ network: processor.networkName }, now);
             } catch (error) {

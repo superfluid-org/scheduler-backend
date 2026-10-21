@@ -32,8 +32,7 @@ interface ProcessedWrapSchedule {
   schedule: WrapSchedule;
   due_since: number;
   due_since_with_gda: number;
-  // due, but the wrap would revert: required wrap amount exceeds the user's
-  // liquidity-token balance or allowance. Not actionable by the keeper.
+  // due, but execution would revert on insufficient user balance/allowance
   blocked_on_user_funds: boolean;
 }
 
@@ -80,9 +79,7 @@ class AutowrapProcessor extends ProcessorBase {
     const liquidityToken = schedule.liquidityToken as `0x${string}`;
     const strategy = schedule.strategy as `0x${string}`;
 
-    // The manager's checkWrap is the keeper's execution trigger: it returns the
-    // exact amount the strategy would transferFrom the user. Returns 0n on error
-    // (fail open: an unclassifiable schedule stays visible as overdue).
+    // keeper's execution trigger; returns 0n on error (fail open)
     const safeCheckWrap = async (): Promise<bigint> => {
       try {
         return await publicClient.readContract({
@@ -180,13 +177,6 @@ class AutowrapProcessor extends ProcessorBase {
       }
     }
 
-    // Verify the user can actually fund the wrap: the manager's checkWrap
-    // is the keeper's execution trigger and returns the exact amount the
-    // strategy would transferFrom. If it exceeds balance or allowance,
-    // executeWrap reverts (e.g. "BEP20: transfer amount exceeds balance")
-    // and the keeper can never clear the schedule - that is a user problem,
-    // not an overdue execution. Checked independently of due_since because
-    // the contract's due condition can diverge from the projection above.
     let blocked_on_user_funds = false;
     const wrapAmount = await safeCheckWrap();
     const available = liqBalance < allowance ? liqBalance : allowance;

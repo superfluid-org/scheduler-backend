@@ -304,9 +304,7 @@ class Exporter {
                 const schedules = await processor.getAutowrapSchedules();
                 const now = Math.floor(Date.now() / 1000);
                 
-                // Count schedules that are overdue; schedules the keeper cannot
-                // execute because the user lacks funds/allowance are tracked
-                // separately and do not count as overdue (or page anyone)
+                // Count overdue schedules; blocked ones are tracked separately
                 const overdueCount = schedules.filter(schedule => {
                     return schedule.due_since > 0 && (now - schedule.due_since) > OVERDUE_THRESHOLD
                         && !schedule.blocked_on_user_funds;
